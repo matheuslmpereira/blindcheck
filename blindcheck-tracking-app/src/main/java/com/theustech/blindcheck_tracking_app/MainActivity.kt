@@ -26,17 +26,22 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.InputChip
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -63,7 +68,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -71,9 +76,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
     var isPackageMenuExpanded by remember { mutableStateOf(false) }
     var isEventTypeMenuExpanded by remember { mutableStateOf(false) }
     var isRecording by remember { mutableStateOf(TrackingEventStore.shared.isRecording) }
-    var isTrackingServiceEnabled by remember {
-        mutableStateOf(readTrackingServiceEnabled(context))
-    }
+    var isTrackingServiceEnabled by remember { mutableStateOf(readTrackingServiceEnabled(context)) }
     var events by remember { mutableStateOf(TrackingEventStore.shared.snapshot()) }
     var observedPackages by remember { mutableStateOf(TrackingEventStore.shared.observedPackagesSnapshot()) }
     var targetPackages by remember { mutableStateOf(TrackingEventStore.shared.targetPackagesSnapshot()) }
@@ -91,57 +94,82 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    fun addPackageFilter(packageName: String) {
-        TrackingEventStore.shared.addTargetPackage(packageName)
-        manualPackage = ""
-        refreshTrackingState(
-            onEventsChanged = { events = it },
-            onObservedPackagesChanged = { observedPackages = it },
-            onTargetPackagesChanged = { targetPackages = it },
-            onTargetEventTypesChanged = { targetEventTypes = it },
-        )
+    fun refresh() {
+        events = TrackingEventStore.shared.snapshot()
+        observedPackages = TrackingEventStore.shared.observedPackagesSnapshot()
+        targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
+        targetEventTypes = TrackingEventStore.shared.targetEventTypesSnapshot()
     }
 
-    fun addEventTypeFilter(eventType: AccessibilityEventType) {
-        TrackingEventStore.shared.addTargetEventType(eventType)
-        refreshTrackingState(
-            onEventsChanged = { events = it },
-            onObservedPackagesChanged = { observedPackages = it },
-            onTargetPackagesChanged = { targetPackages = it },
-            onTargetEventTypesChanged = { targetEventTypes = it },
-        )
-    }
-
-    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text("BlindCheck") },
+                actions = {
+                    if (!isTrackingServiceEnabled) {
+                        Text(
+                            text = "Service off",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
+                    Text(
+                        text = if (isRecording) "● REC" else "○ Paused",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isRecording) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        },
+                        modifier = Modifier.padding(end = 16.dp),
+                    )
+                },
+            )
+        },
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = "BlindCheck event stream",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
+            if (!isTrackingServiceEnabled) {
+                ServiceWarningBanner(
+                    onOpenSettings = {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    },
+                )
+            }
 
-            TrackingServiceStatusMessage(
-                isEnabled = isTrackingServiceEnabled,
-                onOpenSettings = {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                },
-            )
+            // Package filter row
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = manualPackage,
+                    onValueChange = { manualPackage = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    label = { Text("Package filter") },
+                    placeholder = { Text("com.example.app") },
+                )
+                Button(
+                    enabled = manualPackage.isNotBlank(),
+                    onClick = {
+                        TrackingEventStore.shared.addTargetPackage(manualPackage)
+                        manualPackage = ""
+                        refresh()
+                    },
+                ) {
+                    Text("Add")
+                }
+            }
 
-            OutlinedTextField(
-                value = manualPackage,
-                onValueChange = { value -> manualPackage = value },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Add capture filter") },
-                placeholder = { Text("com.example.app") },
-            )
-
+            // Observed packages dropdown
             ExposedDropdownMenuBox(
                 expanded = isPackageMenuExpanded,
                 onExpandedChange = {
@@ -149,7 +177,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 },
             ) {
                 OutlinedTextField(
-                    value = if (observedPackages.isEmpty()) "No packages observed yet" else "Observed packages",
+                    value = if (observedPackages.isEmpty()) "No apps seen yet" else "Observed apps",
                     onValueChange = {},
                     modifier = Modifier
                         .menuAnchor(MenuAnchorType.PrimaryNotEditable)
@@ -157,7 +185,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                     readOnly = true,
                     enabled = observedPackages.isNotEmpty(),
                     singleLine = true,
-                    label = { Text("Capture from observed packages") },
+                    label = { Text("Filter from observed apps") },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = isPackageMenuExpanded)
                     },
@@ -166,31 +194,33 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                     expanded = isPackageMenuExpanded,
                     onDismissRequest = { isPackageMenuExpanded = false },
                 ) {
-                    observedPackages.forEach { packageName ->
+                    observedPackages.forEach { pkg ->
                         DropdownMenuItem(
-                            text = { Text(packageName) },
+                            text = { Text(pkg) },
                             onClick = {
-                                addPackageFilter(packageName)
+                                TrackingEventStore.shared.addTargetPackage(pkg)
                                 isPackageMenuExpanded = false
+                                refresh()
                             },
                         )
                     }
                 }
             }
 
+            // Event type dropdown
             ExposedDropdownMenuBox(
                 expanded = isEventTypeMenuExpanded,
                 onExpandedChange = { isEventTypeMenuExpanded = !isEventTypeMenuExpanded },
             ) {
                 OutlinedTextField(
-                    value = "Accessibility event types",
+                    value = "Event types",
                     onValueChange = {},
                     modifier = Modifier
                         .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth(),
                     readOnly = true,
                     singleLine = true,
-                    label = { Text("Capture by event type") },
+                    label = { Text("Filter by event type") },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = isEventTypeMenuExpanded)
                     },
@@ -201,101 +231,95 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 ) {
                     AccessibilityEventType.entries.forEach { eventType ->
                         DropdownMenuItem(
-                            text = { Text(eventType.androidName) },
+                            text = { Text(eventType.label) },
                             onClick = {
-                                addEventTypeFilter(eventType)
+                                TrackingEventStore.shared.addTargetEventType(eventType)
                                 isEventTypeMenuExpanded = false
+                                refresh()
                             },
                         )
                     }
                 }
             }
 
-            ActivePackageFilters(
-                targetPackages = targetPackages,
-                onRemove = { packageName ->
-                    TrackingEventStore.shared.removeTargetPackage(packageName)
-                    refreshTrackingState(
-                        onEventsChanged = { events = it },
-                        onObservedPackagesChanged = { observedPackages = it },
-                        onTargetPackagesChanged = { targetPackages = it },
-                        onTargetEventTypesChanged = { targetEventTypes = it },
-                    )
-                },
-            )
-
-            ActiveEventTypeFilters(
-                targetEventTypes = targetEventTypes,
-                onRemove = { eventType ->
-                    TrackingEventStore.shared.removeTargetEventType(eventType)
-                    refreshTrackingState(
-                        onEventsChanged = { events = it },
-                        onObservedPackagesChanged = { observedPackages = it },
-                        onTargetPackagesChanged = { targetPackages = it },
-                        onTargetEventTypesChanged = { targetEventTypes = it },
-                    )
-                },
-            )
-
-            Button(
-                enabled = targetPackages.isNotEmpty() || targetEventTypes.isNotEmpty(),
-                onClick = {
-                    TrackingEventStore.shared.clearTargetPackages()
-                    TrackingEventStore.shared.clearTargetEventTypes()
-                    refreshTrackingState(
-                        onEventsChanged = { events = it },
-                        onObservedPackagesChanged = { observedPackages = it },
-                        onTargetPackagesChanged = { targetPackages = it },
-                        onTargetEventTypesChanged = { targetEventTypes = it },
-                    )
-                },
-            ) {
-                Text("Clear filters")
+            // Active filter chips
+            val hasFilters = targetPackages.isNotEmpty() || targetEventTypes.isNotEmpty()
+            if (hasFilters) {
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "Active filters" },
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    targetPackages.forEach { pkg ->
+                        InputChip(
+                            selected = true,
+                            onClick = {
+                                TrackingEventStore.shared.removeTargetPackage(pkg)
+                                refresh()
+                            },
+                            modifier = Modifier.semantics(mergeDescendants = true) {
+                                contentDescription = "$pkg filter. Double tap to remove."
+                            },
+                            label = { Text(pkg) },
+                            trailingIcon = { Text("×") },
+                        )
+                    }
+                    targetEventTypes.forEach { eventType ->
+                        InputChip(
+                            selected = true,
+                            onClick = {
+                                TrackingEventStore.shared.removeTargetEventType(eventType)
+                                refresh()
+                            },
+                            modifier = Modifier.semantics(mergeDescendants = true) {
+                                contentDescription = "${eventType.label} filter. Double tap to remove."
+                            },
+                            label = { Text(eventType.label) },
+                            trailingIcon = { Text("×") },
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        TrackingEventStore.shared.clearTargetPackages()
+                        TrackingEventStore.shared.clearTargetEventTypes()
+                        refresh()
+                    },
+                ) {
+                    Text("Clear all filters")
+                }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    enabled = manualPackage.isNotBlank(),
-                    onClick = { addPackageFilter(manualPackage) },
-                ) {
-                    Text("Add package filter")
-                }
+            HorizontalDivider()
 
+            // Recording controls
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
                         val nextRecording = !isRecording
                         isRecording = nextRecording
                         TrackingEventStore.shared.setRecording(nextRecording)
-                        refreshTrackingState(
-                            onEventsChanged = { events = it },
-                            onObservedPackagesChanged = { observedPackages = it },
-                            onTargetPackagesChanged = { targetPackages = it },
-                            onTargetEventTypesChanged = { targetEventTypes = it },
-                        )
+                        refresh()
                     },
                 ) {
-                    Text(if (isRecording) "Stop recording" else "Start recording")
+                    Text(if (isRecording) "Pause" else "Resume")
                 }
-
-                Button(
+                OutlinedButton(
                     onClick = {
                         TrackingEventStore.shared.clear()
-                        refreshTrackingState(
-                            onEventsChanged = { events = it },
-                            onObservedPackagesChanged = { observedPackages = it },
-                            onTargetPackagesChanged = { targetPackages = it },
-                            onTargetEventTypesChanged = { targetEventTypes = it },
-                        )
+                        refresh()
                     },
                 ) {
-                    Text("Reset session")
+                    Text("Reset")
                 }
             }
 
             Text(
-                text = "Captured events: ${events.size}, packages seen: ${observedPackages.size}",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
+                text = "${events.size} events · ${observedPackages.size} apps seen",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
             )
 
             LazyColumn(
@@ -312,127 +336,62 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TrackingServiceStatusMessage(
-    isEnabled: Boolean,
-    onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
+private fun ServiceWarningBanner(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = MaterialTheme.shapes.small,
     ) {
-        Text(
-            text = if (isEnabled) {
-                "BlindCheck accessibility service enabled"
-            } else {
-                "BlindCheck accessibility service is off"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-        )
-        if (!isEnabled) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Text(
-                text = "Enable the BlindCheck service, not only TalkBack, to capture accessibility events.",
+                text = "BlindCheck service is off",
                 style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onErrorContainer,
             )
-            Button(onClick = onOpenSettings) {
-                Text("Open accessibility settings")
+            Text(
+                text = "Enable BlindCheck (not just TalkBack) to capture accessibility events.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            TextButton(onClick = onOpenSettings) {
+                Text(
+                    text = "Open accessibility settings",
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ActivePackageFilters(
-    targetPackages: List<String>,
-    onRemove: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (targetPackages.isEmpty()) {
-        Text(
-            text = "No capture filter active",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        return
-    }
-
-    FlowRow(
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = "Active capture filters" },
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        targetPackages.forEach { packageName ->
-            InputChip(
-                selected = true,
-                onClick = { onRemove(packageName) },
-                modifier = Modifier.semantics(mergeDescendants = true) {
-                    contentDescription = "$packageName filter. Double tap to remove."
-                },
-                label = { Text(packageName) },
-                trailingIcon = { Text("Remove") },
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ActiveEventTypeFilters(
-    targetEventTypes: List<AccessibilityEventType>,
-    onRemove: (AccessibilityEventType) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (targetEventTypes.isEmpty()) {
-        Text(
-            text = "No event type filter active",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        return
-    }
-
-    FlowRow(
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = "Active event type filters" },
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        targetEventTypes.forEach { eventType ->
-            InputChip(
-                selected = true,
-                onClick = { onRemove(eventType) },
-                modifier = Modifier.semantics(mergeDescendants = true) {
-                    contentDescription = "${eventType.androidName} filter. Double tap to remove."
-                },
-                label = { Text(eventType.androidName) },
-                trailingIcon = { Text("Remove") },
-            )
         }
     }
 }
 
 @Composable
 private fun EventRecordRow(event: A11yEventRecord, modifier: Modifier = Modifier) {
+    val eventTypeLabel = AccessibilityEventType.fromAndroidName(event.eventType)?.label
+        ?: event.eventType
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = "${event.timestamp} | ${event.packageName.orEmpty()} | ${event.eventType}",
+            text = "${event.timestamp} · ${event.packageName.orEmpty()} · $eventTypeLabel",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(
-            text = "Text: ${event.text.joinToString(separator = " | ").ifBlank { "-" }}",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Text(
-            text = "Description: ${event.contentDescription.orEmpty().ifBlank { "-" }}",
-            style = MaterialTheme.typography.bodySmall,
-        )
+        if (event.text.isNotEmpty()) {
+            Text(
+                text = event.text.joinToString(separator = " | "),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (!event.contentDescription.isNullOrBlank()) {
+            Text(
+                text = "Description: ${event.contentDescription}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         event.sourceNode?.let { node ->
             val states = buildList {
                 if (node.focused) add("focused")
@@ -443,6 +402,7 @@ private fun EventRecordRow(event: A11yEventRecord, modifier: Modifier = Modifier
             Text(
                 text = "State: $states",
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
             )
         }
     }
@@ -452,58 +412,56 @@ private fun EventRecordRow(event: A11yEventRecord, modifier: Modifier = Modifier
 @Composable
 private fun TrackingEventStreamScreenPreview() {
     BlindchecktesteappTheme {
-        TrackingEventStreamContentPreview()
+        TrackingEventStreamScreenPreviewContent()
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TrackingEventStreamContentPreview() {
-    Scaffold { innerPadding ->
+private fun TrackingEventStreamScreenPreviewContent() {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("BlindCheck") },
+                actions = {
+                    Text(
+                        text = "Service off",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text(
+                        text = "● REC",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 16.dp),
+                    )
+                },
+            )
+        },
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                text = "BlindCheck event stream",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            TrackingServiceStatusMessage(
-                isEnabled = false,
-                onOpenSettings = {},
-            )
+            ServiceWarningBanner(onOpenSettings = {})
             OutlinedTextField(
                 value = "com.example.app",
                 onValueChange = {},
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Add capture filter") },
-            )
-            OutlinedTextField(
-                value = "Accessibility event types",
-                onValueChange = {},
-                modifier = Modifier.fillMaxWidth(),
-                readOnly = true,
-                singleLine = true,
-                label = { Text("Capture by event type") },
+                label = { Text("Package filter") },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {}) {
-                    Text("Add package filter")
-                }
-                Button(onClick = {}) {
-                    Text("Start recording")
-                }
-                Button(onClick = {}) {
-                    Text("Reset session")
-                }
+                Button(onClick = {}) { Text("Pause") }
+                OutlinedButton(onClick = {}) { Text("Reset") }
             }
             Text(
-                text = "Captured events: 0",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
+                text = "0 events · 0 apps seen",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
             )
         }
     }
@@ -520,18 +478,6 @@ private fun readTrackingServiceEnabled(context: Context): Boolean {
                 serviceClassName = service.resolveInfo?.serviceInfo?.name,
             )
         }
-}
-
-private fun refreshTrackingState(
-    onEventsChanged: (List<A11yEventRecord>) -> Unit,
-    onObservedPackagesChanged: (List<String>) -> Unit,
-    onTargetPackagesChanged: (List<String>) -> Unit,
-    onTargetEventTypesChanged: (List<AccessibilityEventType>) -> Unit,
-) {
-    onEventsChanged(TrackingEventStore.shared.snapshot())
-    onObservedPackagesChanged(TrackingEventStore.shared.observedPackagesSnapshot())
-    onTargetPackagesChanged(TrackingEventStore.shared.targetPackagesSnapshot())
-    onTargetEventTypesChanged(TrackingEventStore.shared.targetEventTypesSnapshot())
 }
 
 private const val EVENT_REFRESH_MS = 500L

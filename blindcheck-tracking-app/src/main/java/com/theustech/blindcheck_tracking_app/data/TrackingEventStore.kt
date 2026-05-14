@@ -70,7 +70,6 @@ class TrackingEventStore {
             observedPackages += packageName
         }
         if (targetPackages.isNotEmpty() && packageName !in targetPackages) return
-        if (!matchesTargetEventTypes(event.eventType)) return
         recordedEvents += event
     }
 
@@ -83,7 +82,13 @@ class TrackingEventStore {
     }
 
     @Synchronized
-    fun snapshot(): List<A11yEventRecord> = recordedEvents.toList()
+    fun snapshot(): List<A11yEventRecord> {
+        return if (targetEventTypes.isEmpty()) {
+            recordedEvents.toList()
+        } else {
+            recordedEvents.filter { matchesTargetEventTypes(it.eventType) }
+        }
+    }
 
     @Synchronized
     fun observedPackagesSnapshot(): List<String> = observedPackages.toList()

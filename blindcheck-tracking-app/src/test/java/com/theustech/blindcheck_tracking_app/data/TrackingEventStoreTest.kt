@@ -185,14 +185,16 @@ class TrackingEventStoreTest {
         val store = TrackingEventStore()
         store.addTargetEventType(AccessibilityEventType.ViewAccessibilityFocused)
         store.record(event("first", eventType = "TYPE_VIEW_ACCESSIBILITY_FOCUSED"))
+        // "ignored" is stored but excluded from snapshot while the filter is active
         store.record(event("ignored", eventType = "TYPE_VIEW_CLICKED"))
 
         assertEquals(listOf("first"), store.snapshot().map { it.id })
 
+        // Clearing the filter reveals all previously-stored events
         store.clearTargetEventTypes()
         store.record(event("second", eventType = "TYPE_VIEW_CLICKED"))
 
-        assertEquals(listOf("first", "second"), store.snapshot().map { it.id })
+        assertEquals(listOf("first", "ignored", "second"), store.snapshot().map { it.id })
         assertTrue(store.targetEventTypesSnapshot().isEmpty())
     }
 
