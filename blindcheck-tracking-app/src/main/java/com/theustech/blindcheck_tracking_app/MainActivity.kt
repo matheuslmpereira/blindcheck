@@ -229,7 +229,7 @@ private fun ActivePackageFilters(
 ) {
     if (targetPackages.isEmpty()) {
         Text(
-            text = "Capturing all observed apps",
+            text = "No capture filter active",
             style = MaterialTheme.typography.bodySmall,
         )
         return
@@ -249,7 +249,7 @@ private fun ActivePackageFilters(
                     contentDescription = "$packageName filter. Double tap to remove."
                 },
                 label = { Text(packageName) },
-                trailingIcon = { Text("x") },
+                trailingIcon = { Text("Remove") },
             )
         }
         Button(onClick = onClear) {

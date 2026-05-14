@@ -60,6 +60,7 @@ class TrackingEventStore {
     fun clear() {
         recordedEvents.clear()
         observedPackages.clear()
+        targetPackages.clear()
     }
 
     @Synchronized
