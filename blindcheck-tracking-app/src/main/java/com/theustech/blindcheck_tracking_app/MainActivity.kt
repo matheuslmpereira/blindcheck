@@ -1,8 +1,8 @@
 package com.theustech.blindcheck_tracking_app
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.os.Bundle
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
@@ -221,7 +221,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             }
 
             Text(
-                text = "Captured events: ${events.size} | Packages seen: ${observedPackages.size}",
+                text = "Captured events: ${events.size}, packages seen: ${observedPackages.size}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
@@ -288,7 +288,8 @@ private fun ActivePackageFilters(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
+            .horizontalScroll(rememberScrollState())
+            .semantics { contentDescription = "Active capture filters" },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         targetPackages.forEach { packageName ->
@@ -402,8 +403,8 @@ private fun readTrackingServiceEnabled(context: Context): Boolean {
         .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
         .any { service ->
             TrackingServiceStatus.isTrackingService(
-                packageName = service.resolveInfo.serviceInfo.packageName,
-                serviceClassName = service.resolveInfo.serviceInfo.name,
+                packageName = service.resolveInfo?.serviceInfo?.packageName,
+                serviceClassName = service.resolveInfo?.serviceInfo?.name,
             )
         }
 }
