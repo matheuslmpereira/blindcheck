@@ -43,6 +43,49 @@ class TrackingEventStoreTest {
     }
 
     @Test
+    fun record_appliesTargetEventTypeFilter() {
+        val store = TrackingEventStore()
+        store.addTargetEventType(AccessibilityEventType.ViewAccessibilityFocused)
+
+        store.record(event("ignored", eventType = "TYPE_VIEW_CLICKED"))
+        store.record(event("kept", eventType = "TYPE_VIEW_ACCESSIBILITY_FOCUSED"))
+
+        assertEquals(listOf("kept"), store.snapshot().map { it.id })
+        assertEquals(listOf(AccessibilityEventType.ViewAccessibilityFocused), store.targetEventTypesSnapshot())
+    }
+
+    @Test
+    fun record_appliesPackageAndEventTypeFiltersTogether() {
+        val store = TrackingEventStore()
+        store.addTargetPackage("com.target")
+        store.addTargetEventType(AccessibilityEventType.ViewAccessibilityFocused)
+
+        store.record(
+            event(
+                id = "ignored-package",
+                packageName = "com.other",
+                eventType = "TYPE_VIEW_ACCESSIBILITY_FOCUSED",
+            ),
+        )
+        store.record(
+            event(
+                id = "ignored-event-type",
+                packageName = "com.target",
+                eventType = "TYPE_WINDOW_CONTENT_CHANGED",
+            ),
+        )
+        store.record(
+            event(
+                id = "kept",
+                packageName = "com.target",
+                eventType = "TYPE_VIEW_ACCESSIBILITY_FOCUSED",
+            ),
+        )
+
+        assertEquals(listOf("kept"), store.snapshot().map { it.id })
+    }
+
+    @Test
     fun record_dropsMissingPackageEventsWhenCaptureFilterIsActive() {
         val store = TrackingEventStore()
         store.addTargetPackage("com.target")
@@ -62,6 +105,35 @@ class TrackingEventStoreTest {
         store.addTargetPackage("  ")
 
         assertTrue(store.targetPackagesSnapshot().isEmpty())
+    }
+
+    @Test
+    fun addTargetPackage_deduplicatesPackages() {
+        val store = TrackingEventStore()
+
+        store.addTargetPackage("com.target")
+        store.addTargetPackage("com.target")
+
+        assertEquals(listOf("com.target"), store.targetPackagesSnapshot())
+    }
+
+    @Test
+    fun addTargetEventType_ignoresNullEventTypes() {
+        val store = TrackingEventStore()
+
+        store.addTargetEventType(null)
+
+        assertTrue(store.targetEventTypesSnapshot().isEmpty())
+    }
+
+    @Test
+    fun addTargetEventType_deduplicatesEventTypes() {
+        val store = TrackingEventStore()
+
+        store.addTargetEventType(AccessibilityEventType.ViewAccessibilityFocused)
+        store.addTargetEventType(AccessibilityEventType.ViewAccessibilityFocused)
+
+        assertEquals(listOf(AccessibilityEventType.ViewAccessibilityFocused), store.targetEventTypesSnapshot())
     }
 
     @Test
@@ -109,6 +181,22 @@ class TrackingEventStoreTest {
     }
 
     @Test
+    fun clearTargetEventTypes_returnsToShowingAllEventTypes() {
+        val store = TrackingEventStore()
+        store.addTargetEventType(AccessibilityEventType.ViewAccessibilityFocused)
+        store.record(event("first", eventType = "TYPE_VIEW_ACCESSIBILITY_FOCUSED"))
+        store.record(event("ignored", eventType = "TYPE_VIEW_CLICKED"))
+
+        assertEquals(listOf("first"), store.snapshot().map { it.id })
+
+        store.clearTargetEventTypes()
+        store.record(event("second", eventType = "TYPE_VIEW_CLICKED"))
+
+        assertEquals(listOf("first", "second"), store.snapshot().map { it.id })
+        assertTrue(store.targetEventTypesSnapshot().isEmpty())
+    }
+
+    @Test
     fun record_ignoresEventsWhenRecordingIsOff() {
         val store = TrackingEventStore()
         store.stopRecording()
@@ -135,6 +223,7 @@ class TrackingEventStoreTest {
     fun clear_resetsObservedPackagesAndTargetPackages() {
         val store = TrackingEventStore()
         store.addTargetPackage("com.first")
+        store.addTargetEventType(AccessibilityEventType.ViewAccessibilityFocused)
         store.record(event("first", packageName = "com.first"))
         store.record(event("second", packageName = "com.second"))
 
@@ -142,6 +231,7 @@ class TrackingEventStoreTest {
 
         assertTrue(store.observedPackagesSnapshot().isEmpty())
         assertTrue(store.targetPackagesSnapshot().isEmpty())
+        assertTrue(store.targetEventTypesSnapshot().isEmpty())
     }
 
     @Test
@@ -158,12 +248,13 @@ class TrackingEventStoreTest {
     private fun event(
         id: String,
         packageName: String? = "com.example.app",
+        eventType: String = "TYPE_VIEW_CLICKED",
     ): A11yEventRecord {
         return A11yEventRecord(
             id = id,
             timestamp = 1L,
             packageName = packageName,
-            eventType = "TYPE_VIEW_CLICKED",
+            eventType = eventType,
         )
     }
 }

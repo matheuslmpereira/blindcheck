@@ -7,6 +7,7 @@ class TrackingEventStore {
     // Session-scoped history for the filter dropdown. Reset through clear().
     private val observedPackages = linkedSetOf<String>()
     private val targetPackages = linkedSetOf<String>()
+    private val targetEventTypes = linkedSetOf<AccessibilityEventType>()
 
     @Volatile
     var isRecording: Boolean = true
@@ -47,6 +48,21 @@ class TrackingEventStore {
     }
 
     @Synchronized
+    fun addTargetEventType(eventType: AccessibilityEventType?) {
+        eventType?.let(targetEventTypes::add)
+    }
+
+    @Synchronized
+    fun removeTargetEventType(eventType: AccessibilityEventType) {
+        targetEventTypes.remove(eventType)
+    }
+
+    @Synchronized
+    fun clearTargetEventTypes() {
+        targetEventTypes.clear()
+    }
+
+    @Synchronized
     fun record(event: A11yEventRecord) {
         if (!isRecording) return
         val packageName = event.packageName.normalizedPackageName()
@@ -54,6 +70,7 @@ class TrackingEventStore {
             observedPackages += packageName
         }
         if (targetPackages.isNotEmpty() && packageName !in targetPackages) return
+        if (!matchesTargetEventTypes(event.eventType)) return
         recordedEvents += event
     }
 
@@ -62,6 +79,7 @@ class TrackingEventStore {
         recordedEvents.clear()
         observedPackages.clear()
         targetPackages.clear()
+        targetEventTypes.clear()
     }
 
     @Synchronized
@@ -73,8 +91,16 @@ class TrackingEventStore {
     @Synchronized
     fun targetPackagesSnapshot(): List<String> = targetPackages.toList()
 
+    @Synchronized
+    fun targetEventTypesSnapshot(): List<AccessibilityEventType> = targetEventTypes.toList()
+
     private fun String?.normalizedPackageName(): String? {
         return this?.trim()?.takeUnless { it.isBlank() }
+    }
+
+    private fun matchesTargetEventTypes(eventType: String): Boolean {
+        return targetEventTypes.isEmpty() ||
+            AccessibilityEventType.fromAndroidName(eventType) in targetEventTypes
     }
 
     companion object {

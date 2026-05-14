@@ -9,14 +9,14 @@ import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.theustech.blindcheck_testing.model.A11yEventRecord
+import com.theustech.blindcheck_tracking_app.data.AccessibilityEventType
 import com.theustech.blindcheck_tracking_app.data.TrackingEventStore
 import com.theustech.blindcheck_tracking_app.data.TrackingServiceStatus
 import com.theustech.blindcheck_tracking_app.ui.theme.BlindchecktesteappTheme
@@ -68,6 +69,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var manualPackage by remember { mutableStateOf("") }
     var isPackageMenuExpanded by remember { mutableStateOf(false) }
+    var isEventTypeMenuExpanded by remember { mutableStateOf(false) }
     var isRecording by remember { mutableStateOf(TrackingEventStore.shared.isRecording) }
     var isTrackingServiceEnabled by remember {
         mutableStateOf(readTrackingServiceEnabled(context))
@@ -75,6 +77,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
     var events by remember { mutableStateOf(TrackingEventStore.shared.snapshot()) }
     var observedPackages by remember { mutableStateOf(TrackingEventStore.shared.observedPackagesSnapshot()) }
     var targetPackages by remember { mutableStateOf(TrackingEventStore.shared.targetPackagesSnapshot()) }
+    var targetEventTypes by remember { mutableStateOf(TrackingEventStore.shared.targetEventTypesSnapshot()) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -83,6 +86,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             events = TrackingEventStore.shared.snapshot()
             observedPackages = TrackingEventStore.shared.observedPackagesSnapshot()
             targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
+            targetEventTypes = TrackingEventStore.shared.targetEventTypesSnapshot()
             delay(EVENT_REFRESH_MS)
         }
     }
@@ -94,6 +98,17 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             onEventsChanged = { events = it },
             onObservedPackagesChanged = { observedPackages = it },
             onTargetPackagesChanged = { targetPackages = it },
+            onTargetEventTypesChanged = { targetEventTypes = it },
+        )
+    }
+
+    fun addEventTypeFilter(eventType: AccessibilityEventType) {
+        TrackingEventStore.shared.addTargetEventType(eventType)
+        refreshTrackingState(
+            onEventsChanged = { events = it },
+            onObservedPackagesChanged = { observedPackages = it },
+            onTargetPackagesChanged = { targetPackages = it },
+            onTargetEventTypesChanged = { targetEventTypes = it },
         )
     }
 
@@ -163,6 +178,39 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 }
             }
 
+            ExposedDropdownMenuBox(
+                expanded = isEventTypeMenuExpanded,
+                onExpandedChange = { isEventTypeMenuExpanded = !isEventTypeMenuExpanded },
+            ) {
+                OutlinedTextField(
+                    value = "Accessibility event types",
+                    onValueChange = {},
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth(),
+                    readOnly = true,
+                    singleLine = true,
+                    label = { Text("Capture by event type") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isEventTypeMenuExpanded)
+                    },
+                )
+                ExposedDropdownMenu(
+                    expanded = isEventTypeMenuExpanded,
+                    onDismissRequest = { isEventTypeMenuExpanded = false },
+                ) {
+                    AccessibilityEventType.entries.forEach { eventType ->
+                        DropdownMenuItem(
+                            text = { Text(eventType.androidName) },
+                            onClick = {
+                                addEventTypeFilter(eventType)
+                                isEventTypeMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
             ActivePackageFilters(
                 targetPackages = targetPackages,
                 onRemove = { packageName ->
@@ -171,24 +219,46 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                         onEventsChanged = { events = it },
                         onObservedPackagesChanged = { observedPackages = it },
                         onTargetPackagesChanged = { targetPackages = it },
+                        onTargetEventTypesChanged = { targetEventTypes = it },
                     )
                 },
-                onClear = {
-                    TrackingEventStore.shared.clearTargetPackages()
+            )
+
+            ActiveEventTypeFilters(
+                targetEventTypes = targetEventTypes,
+                onRemove = { eventType ->
+                    TrackingEventStore.shared.removeTargetEventType(eventType)
                     refreshTrackingState(
                         onEventsChanged = { events = it },
                         onObservedPackagesChanged = { observedPackages = it },
                         onTargetPackagesChanged = { targetPackages = it },
+                        onTargetEventTypesChanged = { targetEventTypes = it },
                     )
                 },
             )
+
+            Button(
+                enabled = targetPackages.isNotEmpty() || targetEventTypes.isNotEmpty(),
+                onClick = {
+                    TrackingEventStore.shared.clearTargetPackages()
+                    TrackingEventStore.shared.clearTargetEventTypes()
+                    refreshTrackingState(
+                        onEventsChanged = { events = it },
+                        onObservedPackagesChanged = { observedPackages = it },
+                        onTargetPackagesChanged = { targetPackages = it },
+                        onTargetEventTypesChanged = { targetEventTypes = it },
+                    )
+                },
+            ) {
+                Text("Clear filters")
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     enabled = manualPackage.isNotBlank(),
                     onClick = { addPackageFilter(manualPackage) },
                 ) {
-                    Text("Add filter")
+                    Text("Add package filter")
                 }
 
                 Button(
@@ -200,6 +270,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                             onEventsChanged = { events = it },
                             onObservedPackagesChanged = { observedPackages = it },
                             onTargetPackagesChanged = { targetPackages = it },
+                            onTargetEventTypesChanged = { targetEventTypes = it },
                         )
                     },
                 ) {
@@ -213,6 +284,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                             onEventsChanged = { events = it },
                             onObservedPackagesChanged = { observedPackages = it },
                             onTargetPackagesChanged = { targetPackages = it },
+                            onTargetEventTypesChanged = { targetEventTypes = it },
                         )
                     },
                 ) {
@@ -270,11 +342,11 @@ private fun TrackingServiceStatusMessage(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ActivePackageFilters(
     targetPackages: List<String>,
     onRemove: (String) -> Unit,
-    onClear: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (targetPackages.isEmpty()) {
@@ -285,12 +357,12 @@ private fun ActivePackageFilters(
         return
     }
 
-    Row(
+    FlowRow(
         modifier = modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
             .semantics { contentDescription = "Active capture filters" },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         targetPackages.forEach { packageName ->
             InputChip(
@@ -303,8 +375,41 @@ private fun ActivePackageFilters(
                 trailingIcon = { Text("Remove") },
             )
         }
-        Button(onClick = onClear) {
-            Text("Clear filters")
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ActiveEventTypeFilters(
+    targetEventTypes: List<AccessibilityEventType>,
+    onRemove: (AccessibilityEventType) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (targetEventTypes.isEmpty()) {
+        Text(
+            text = "No event type filter active",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        return
+    }
+
+    FlowRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Active event type filters" },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        targetEventTypes.forEach { eventType ->
+            InputChip(
+                selected = true,
+                onClick = { onRemove(eventType) },
+                modifier = Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = "${eventType.androidName} filter. Double tap to remove."
+                },
+                label = { Text(eventType.androidName) },
+                trailingIcon = { Text("Remove") },
+            )
         }
     }
 }
@@ -376,9 +481,17 @@ private fun TrackingEventStreamContentPreview() {
                 singleLine = true,
                 label = { Text("Add capture filter") },
             )
+            OutlinedTextField(
+                value = "Accessibility event types",
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth(),
+                readOnly = true,
+                singleLine = true,
+                label = { Text("Capture by event type") },
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {}) {
-                    Text("Add filter")
+                    Text("Add package filter")
                 }
                 Button(onClick = {}) {
                     Text("Start recording")
@@ -413,10 +526,12 @@ private fun refreshTrackingState(
     onEventsChanged: (List<A11yEventRecord>) -> Unit,
     onObservedPackagesChanged: (List<String>) -> Unit,
     onTargetPackagesChanged: (List<String>) -> Unit,
+    onTargetEventTypesChanged: (List<AccessibilityEventType>) -> Unit,
 ) {
     onEventsChanged(TrackingEventStore.shared.snapshot())
     onObservedPackagesChanged(TrackingEventStore.shared.observedPackagesSnapshot())
     onTargetPackagesChanged(TrackingEventStore.shared.targetPackagesSnapshot())
+    onTargetEventTypesChanged(TrackingEventStore.shared.targetEventTypesSnapshot())
 }
 
 private const val EVENT_REFRESH_MS = 500L
