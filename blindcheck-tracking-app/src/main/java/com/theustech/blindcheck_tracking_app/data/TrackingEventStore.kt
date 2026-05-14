@@ -53,10 +53,6 @@ class TrackingEventStore {
     @Synchronized
     fun snapshot(): List<A11yEventRecord> = events.toList()
 
-    fun list(): List<A11yEventRecord> = snapshot()
-
-    fun eventsSnapshot(): List<A11yEventRecord> = snapshot()
-
     companion object {
         val shared = TrackingEventStore()
     }

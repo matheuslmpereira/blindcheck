@@ -66,16 +66,6 @@ class TrackingEventStoreTest {
         assertEquals(listOf("first"), store.snapshot().map { it.id })
     }
 
-    @Test
-    fun list_returnsCurrentSnapshot() {
-        val store = TrackingEventStore()
-        store.startRecording()
-
-        store.record(event("first"))
-
-        assertEquals(store.snapshot(), store.list())
-    }
-
     private fun event(
         id: String,
         packageName: String? = "com.example.app",

@@ -41,6 +41,22 @@ class A11yEventNormalizerTest {
     }
 
     @Test
+    fun normalize_treatsBlankStringsAsNull() {
+        val event = AccessibilityEvent.obtain(AccessibilityEvent.TYPE_VIEW_CLICKED).apply {
+            eventTime = 1L
+            packageName = "   "
+            contentDescription = "  "
+            text.add("  ")
+        }
+
+        val record = normalizer.normalize(event)
+
+        assertNull("blank packageName should be null", record.packageName)
+        assertNull("blank contentDescription should be null", record.contentDescription)
+        assertEquals(emptyList<String>(), record.text)
+    }
+
+    @Test
     fun normalize_extractsPackageClassEventTypeTextAndContentDescription() {
         val source = AccessibilityNodeInfo.obtain().apply {
             text = "Entrar"

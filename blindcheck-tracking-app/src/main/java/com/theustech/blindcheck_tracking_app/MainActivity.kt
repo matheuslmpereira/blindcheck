@@ -49,12 +49,12 @@ class MainActivity : ComponentActivity() {
 fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
     var targetPackage by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(TrackingEventStore.shared.isRecording) }
-    var events by remember { mutableStateOf(TrackingEventStore.shared.eventsSnapshot()) }
+    var events by remember { mutableStateOf(TrackingEventStore.shared.snapshot()) }
 
     LaunchedEffect(Unit) {
         while (true) {
             isRecording = TrackingEventStore.shared.isRecording
-            events = TrackingEventStore.shared.eventsSnapshot()
+            events = TrackingEventStore.shared.snapshot()
             delay(EVENT_REFRESH_MS)
         }
     }
@@ -91,7 +91,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                         val nextRecording = !isRecording
                         isRecording = nextRecording
                         TrackingEventStore.shared.setRecording(nextRecording)
-                        events = TrackingEventStore.shared.eventsSnapshot()
+                        events = TrackingEventStore.shared.snapshot()
                     },
                 ) {
                     Text(if (isRecording) "Stop recording" else "Start recording")
@@ -100,7 +100,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 Button(
                     onClick = {
                         TrackingEventStore.shared.clear()
-                        events = TrackingEventStore.shared.eventsSnapshot()
+                        events = TrackingEventStore.shared.snapshot()
                     },
                 ) {
                     Text("Clear")
@@ -145,6 +145,18 @@ private fun EventRecordRow(event: A11yEventRecord, modifier: Modifier = Modifier
             text = "Description: ${event.contentDescription.orEmpty().ifBlank { "-" }}",
             style = MaterialTheme.typography.bodySmall,
         )
+        event.sourceNode?.let { node ->
+            val states = buildList {
+                if (node.focused) add("focused")
+                if (node.clickable) add("clickable")
+                if (node.editable) add("editable")
+                if (!node.enabled) add("disabled")
+            }.joinToString(", ").ifBlank { "enabled" }
+            Text(
+                text = "State: $states",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 
