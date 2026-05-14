@@ -339,8 +339,9 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
 
             val sortedEvents = if (newestFirst) events.reversed() else events
             val listState = rememberLazyListState()
-            LaunchedEffect(newestFirst, events.size) {
-                if (newestFirst) listState.scrollToItem(0)
+            LaunchedEffect(newestFirst) { listState.scrollToItem(0) }
+            LaunchedEffect(events.size) {
+                if (newestFirst && listState.firstVisibleItemIndex == 0) listState.scrollToItem(0)
             }
             LazyColumn(
                 state = listState,
