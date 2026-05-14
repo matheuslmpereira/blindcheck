@@ -7,9 +7,19 @@ import org.junit.Test
 
 class TrackingEventStoreTest {
     @Test
+    fun record_recordsAllPackagesByDefault() {
+        val store = TrackingEventStore()
+
+        store.record(event("first", packageName = "com.first"))
+        store.record(event("second", packageName = "com.second"))
+        store.record(event("missing-package", packageName = null))
+
+        assertEquals(listOf("first", "second", "missing-package"), store.snapshot().map { it.id })
+    }
+
+    @Test
     fun record_preservesInsertionOrder() {
         val store = TrackingEventStore()
-        store.startRecording()
 
         store.record(event("first", packageName = "com.example.app"))
         store.record(event("second", packageName = "com.example.app"))
@@ -21,7 +31,6 @@ class TrackingEventStoreTest {
     @Test
     fun record_appliesTargetPackageFilter() {
         val store = TrackingEventStore()
-        store.startRecording()
         store.setTargetPackage("com.target")
 
         store.record(event("ignored", packageName = "com.other"))
@@ -34,6 +43,7 @@ class TrackingEventStoreTest {
     @Test
     fun record_ignoresEventsWhenRecordingIsOff() {
         val store = TrackingEventStore()
+        store.stopRecording()
 
         store.record(event("ignored"))
         store.startRecording()
@@ -45,7 +55,6 @@ class TrackingEventStoreTest {
     @Test
     fun clear_removesRecordedEvents() {
         val store = TrackingEventStore()
-        store.startRecording()
         store.record(event("first"))
         store.record(event("second"))
 
@@ -57,7 +66,6 @@ class TrackingEventStoreTest {
     @Test
     fun snapshot_returnsCopy() {
         val store = TrackingEventStore()
-        store.startRecording()
         store.record(event("first"))
 
         val snapshot = store.snapshot().toMutableList()

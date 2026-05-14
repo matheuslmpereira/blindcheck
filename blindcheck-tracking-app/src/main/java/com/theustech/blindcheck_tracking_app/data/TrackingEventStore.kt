@@ -6,7 +6,7 @@ class TrackingEventStore {
     private val events = mutableListOf<A11yEventRecord>()
 
     @Volatile
-    var isRecording: Boolean = false
+    var isRecording: Boolean = true
         private set
 
     @Volatile
