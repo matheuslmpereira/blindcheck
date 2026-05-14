@@ -4,6 +4,7 @@ import com.theustech.blindcheck_testing.model.A11yEventRecord
 
 class TrackingEventStore {
     private val recordedEvents = mutableListOf<A11yEventRecord>()
+    // Session-scoped history for the filter dropdown. Reset through clear().
     private val observedPackages = linkedSetOf<String>()
     private val targetPackages = linkedSetOf<String>()
 

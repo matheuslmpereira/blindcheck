@@ -15,7 +15,7 @@ class TrackingServiceStatusTest {
     fun isTrackingServiceEnabled_matchesFullComponent() {
         assertTrue(
             TrackingServiceStatus.isTrackingServiceEnabled(
-                "com.example/.Other:${TrackingServiceStatus.TRACKING_SERVICE_COMPONENT}",
+                "com.example/.Other:com.theustech.blindcheck_tracking_app/com.theustech.blindcheck_tracking_app.TrackingAccessibilityService",
             ),
         )
     }
@@ -24,7 +24,7 @@ class TrackingServiceStatusTest {
     fun isTrackingServiceEnabled_matchesShortComponent() {
         assertTrue(
             TrackingServiceStatus.isTrackingServiceEnabled(
-                "com.example/.Other:${TrackingServiceStatus.TRACKING_SERVICE_SHORT_COMPONENT}",
+                "com.example/.Other:com.theustech.blindcheck_tracking_app/.TrackingAccessibilityService",
             ),
         )
     }
@@ -34,6 +34,31 @@ class TrackingServiceStatusTest {
         assertFalse(
             TrackingServiceStatus.isTrackingServiceEnabled(
                 "com.google.android.marvin.talkback/.TalkBackService",
+            ),
+        )
+    }
+
+    @Test
+    fun isTrackingServiceEnabled_doesNotMatchPrefixOnly() {
+        assertFalse(
+            TrackingServiceStatus.isTrackingServiceEnabled(
+                "com.theustech.blindcheck_tracking_app.extra/.TrackingAccessibilityService",
+            ),
+        )
+    }
+
+    @Test
+    fun isTrackingService_matchesPackageAndClassName() {
+        assertTrue(
+            TrackingServiceStatus.isTrackingService(
+                packageName = "com.theustech.blindcheck_tracking_app",
+                serviceClassName = "com.theustech.blindcheck_tracking_app.TrackingAccessibilityService",
+            ),
+        )
+        assertFalse(
+            TrackingServiceStatus.isTrackingService(
+                packageName = "com.theustech.blindcheck_tracking_app.extra",
+                serviceClassName = "com.theustech.blindcheck_tracking_app.TrackingAccessibilityService",
             ),
         )
     }

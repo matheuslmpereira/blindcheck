@@ -2,8 +2,10 @@ package com.theustech.blindcheck_tracking_app
 
 import android.content.Context
 import android.content.Intent
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.os.Bundle
 import android.provider.Settings
+import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -214,7 +216,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                         )
                     },
                 ) {
-                    Text("Clear all")
+                    Text("Reset session")
                 }
             }
 
@@ -381,7 +383,7 @@ private fun TrackingEventStreamContentPreview() {
                     Text("Start recording")
                 }
                 Button(onClick = {}) {
-                    Text("Clear all")
+                    Text("Reset session")
                 }
             }
             Text(
@@ -394,11 +396,16 @@ private fun TrackingEventStreamContentPreview() {
 }
 
 private fun readTrackingServiceEnabled(context: Context): Boolean {
-    val enabledServices = Settings.Secure.getString(
-        context.contentResolver,
-        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-    )
-    return TrackingServiceStatus.isTrackingServiceEnabled(enabledServices)
+    val accessibilityManager = context.getSystemService(AccessibilityManager::class.java)
+        ?: return false
+    return accessibilityManager
+        .getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+        .any { service ->
+            TrackingServiceStatus.isTrackingService(
+                packageName = service.resolveInfo.serviceInfo.packageName,
+                serviceClassName = service.resolveInfo.serviceInfo.name,
+            )
+        }
 }
 
 private fun refreshTrackingState(
