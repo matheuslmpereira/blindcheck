@@ -4,16 +4,24 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,18 +53,31 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
-    var targetPackage by remember { mutableStateOf("") }
+    var manualPackage by remember { mutableStateOf("") }
+    var isPackageMenuExpanded by remember { mutableStateOf(false) }
     var isRecording by remember { mutableStateOf(TrackingEventStore.shared.isRecording) }
     var events by remember { mutableStateOf(TrackingEventStore.shared.snapshot()) }
+    var observedPackages by remember { mutableStateOf(TrackingEventStore.shared.observedPackagesSnapshot()) }
+    var targetPackages by remember { mutableStateOf(TrackingEventStore.shared.targetPackagesSnapshot()) }
 
     LaunchedEffect(Unit) {
         while (true) {
             isRecording = TrackingEventStore.shared.isRecording
             events = TrackingEventStore.shared.snapshot()
+            observedPackages = TrackingEventStore.shared.observedPackagesSnapshot()
+            targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
             delay(EVENT_REFRESH_MS)
         }
+    }
+
+    fun addPackageFilter(packageName: String) {
+        TrackingEventStore.shared.addTargetPackage(packageName)
+        manualPackage = ""
+        events = TrackingEventStore.shared.snapshot()
+        targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
     }
 
     Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
@@ -74,18 +95,72 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             )
 
             OutlinedTextField(
-                value = targetPackage,
-                onValueChange = { value ->
-                    targetPackage = value
-                    TrackingEventStore.shared.setTargetPackage(value.trim().ifEmpty { null })
-                },
+                value = manualPackage,
+                onValueChange = { value -> manualPackage = value },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Target package") },
+                label = { Text("Add package filter") },
                 placeholder = { Text("com.example.app") },
             )
 
+            ExposedDropdownMenuBox(
+                expanded = isPackageMenuExpanded,
+                onExpandedChange = {
+                    isPackageMenuExpanded = observedPackages.isNotEmpty() && !isPackageMenuExpanded
+                },
+            ) {
+                OutlinedTextField(
+                    value = if (observedPackages.isEmpty()) "No packages observed yet" else "Observed packages",
+                    onValueChange = {},
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth(),
+                    readOnly = true,
+                    enabled = observedPackages.isNotEmpty(),
+                    singleLine = true,
+                    label = { Text("Filter from observed packages") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isPackageMenuExpanded)
+                    },
+                )
+                ExposedDropdownMenu(
+                    expanded = isPackageMenuExpanded,
+                    onDismissRequest = { isPackageMenuExpanded = false },
+                ) {
+                    observedPackages.forEach { packageName ->
+                        DropdownMenuItem(
+                            text = { Text(packageName) },
+                            onClick = {
+                                addPackageFilter(packageName)
+                                isPackageMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
+            ActivePackageFilters(
+                targetPackages = targetPackages,
+                onRemove = { packageName ->
+                    TrackingEventStore.shared.removeTargetPackage(packageName)
+                    events = TrackingEventStore.shared.snapshot()
+                    targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
+                },
+                onClear = {
+                    TrackingEventStore.shared.clearTargetPackages()
+                    events = TrackingEventStore.shared.snapshot()
+                    targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
+                },
+            )
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    enabled = manualPackage.isNotBlank(),
+                    onClick = { addPackageFilter(manualPackage) },
+                ) {
+                    Text("Add filter")
+                }
+
                 Button(
                     onClick = {
                         val nextRecording = !isRecording
@@ -108,7 +183,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             }
 
             Text(
-                text = "Events: ${events.size}",
+                text = "Events: ${events.size} | Apps observed: ${observedPackages.size}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
@@ -122,6 +197,41 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                     HorizontalDivider()
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ActivePackageFilters(
+    targetPackages: List<String>,
+    onRemove: (String) -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (targetPackages.isEmpty()) {
+        Text(
+            text = "Showing all observed apps",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        return
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        targetPackages.forEach { packageName ->
+            InputChip(
+                selected = true,
+                onClick = { onRemove(packageName) },
+                label = { Text(packageName) },
+                trailingIcon = { Text("x") },
+            )
+        }
+        Button(onClick = onClear) {
+            Text("Clear filters")
         }
     }
 }
@@ -187,9 +297,12 @@ private fun TrackingEventStreamContentPreview() {
                 onValueChange = {},
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Target package") },
+                label = { Text("Add package filter") },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {}) {
+                    Text("Add filter")
+                }
                 Button(onClick = {}) {
                     Text("Start recording")
                 }
