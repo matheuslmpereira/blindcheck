@@ -32,7 +32,7 @@ class TrackingEventStoreTest {
     @Test
     fun record_appliesTargetPackageFilter() {
         val store = TrackingEventStore()
-        store.setTargetPackage("com.target")
+        store.addTargetPackage("com.target")
 
         store.record(event("ignored", packageName = "com.other"))
         store.record(event("kept", packageName = "com.target"))
@@ -40,20 +40,6 @@ class TrackingEventStoreTest {
 
         assertEquals(listOf("kept"), store.snapshot().map { it.id })
         assertEquals(listOf("com.other", "com.target"), store.observedPackagesSnapshot())
-    }
-
-    @Test
-    fun addTargetPackage_addsToExistingTargetPackageFilter() {
-        val store = TrackingEventStore()
-        store.setTargetPackage("com.first")
-        store.addTargetPackage("com.second")
-
-        store.record(event("first", packageName = "com.first"))
-        store.record(event("second", packageName = "com.second"))
-        store.record(event("ignored", packageName = "com.third"))
-
-        assertEquals(listOf("first", "second"), store.snapshot().map { it.id })
-        assertEquals(listOf("com.first", "com.second"), store.targetPackagesSnapshot())
     }
 
     @Test

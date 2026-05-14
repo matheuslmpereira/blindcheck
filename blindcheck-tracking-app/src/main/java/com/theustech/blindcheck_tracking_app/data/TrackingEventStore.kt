@@ -31,12 +31,6 @@ class TrackingEventStore {
     }
 
     @Synchronized
-    fun setTargetPackage(packageName: String?) {
-        targetPackages.clear()
-        packageName.normalizedPackageName()?.let(targetPackages::add)
-    }
-
-    @Synchronized
     fun addTargetPackage(packageName: String?) {
         packageName.normalizedPackageName()?.let(targetPackages::add)
     }
@@ -69,13 +63,7 @@ class TrackingEventStore {
     }
 
     @Synchronized
-    fun snapshot(): List<A11yEventRecord> {
-        if (targetPackages.isEmpty()) return recordedEvents.toList()
-
-        return recordedEvents
-            .filter { event -> event.packageName.normalizedPackageName() in targetPackages }
-            .toList()
-    }
+    fun snapshot(): List<A11yEventRecord> = recordedEvents.toList()
 
     @Synchronized
     fun observedPackagesSnapshot(): List<String> = observedPackages.toList()

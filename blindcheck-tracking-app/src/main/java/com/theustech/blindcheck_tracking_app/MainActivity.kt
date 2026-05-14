@@ -104,7 +104,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 onValueChange = { value -> manualPackage = value },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Add package filter") },
+                label = { Text("Add capture filter") },
                 placeholder = { Text("com.example.app") },
             )
 
@@ -123,7 +123,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                     readOnly = true,
                     enabled = observedPackages.isNotEmpty(),
                     singleLine = true,
-                    label = { Text("Filter from observed packages") },
+                    label = { Text("Capture from observed packages") },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = isPackageMenuExpanded)
                     },
@@ -197,12 +197,12 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                         )
                     },
                 ) {
-                    Text("Clear")
+                    Text("Clear all")
                 }
             }
 
             Text(
-                text = "Events: ${events.size} | Apps observed: ${observedPackages.size}",
+                text = "Captured events: ${events.size} | Apps observed: ${observedPackages.size}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
@@ -229,7 +229,7 @@ private fun ActivePackageFilters(
 ) {
     if (targetPackages.isEmpty()) {
         Text(
-            text = "Showing all observed apps",
+            text = "Capturing all observed apps",
             style = MaterialTheme.typography.bodySmall,
         )
         return
@@ -245,7 +245,7 @@ private fun ActivePackageFilters(
             InputChip(
                 selected = true,
                 onClick = { onRemove(packageName) },
-                modifier = Modifier.semantics {
+                modifier = Modifier.semantics(mergeDescendants = true) {
                     contentDescription = "$packageName filter. Double tap to remove."
                 },
                 label = { Text(packageName) },
@@ -319,7 +319,7 @@ private fun TrackingEventStreamContentPreview() {
                 onValueChange = {},
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Add package filter") },
+                label = { Text("Add capture filter") },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {}) {
@@ -329,11 +329,11 @@ private fun TrackingEventStreamContentPreview() {
                     Text("Start recording")
                 }
                 Button(onClick = {}) {
-                    Text("Clear")
+                    Text("Clear all")
                 }
             }
             Text(
-                text = "Events: 0",
+                text = "Captured events: 0",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
