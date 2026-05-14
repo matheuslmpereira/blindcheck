@@ -43,6 +43,20 @@ class TrackingEventStoreTest {
     }
 
     @Test
+    fun addTargetPackage_addsToExistingTargetPackageFilter() {
+        val store = TrackingEventStore()
+        store.setTargetPackage("com.first")
+        store.addTargetPackage("com.second")
+
+        store.record(event("first", packageName = "com.first"))
+        store.record(event("second", packageName = "com.second"))
+        store.record(event("ignored", packageName = "com.third"))
+
+        assertEquals(listOf("first", "second"), store.snapshot().map { it.id })
+        assertEquals(listOf("com.first", "com.second"), store.targetPackagesSnapshot())
+    }
+
+    @Test
     fun record_appliesMultipleTargetPackageFilters() {
         val store = TrackingEventStore()
         store.addTargetPackage("com.first")
@@ -75,11 +89,12 @@ class TrackingEventStoreTest {
         val store = TrackingEventStore()
         store.addTargetPackage("com.first")
         store.record(event("first", packageName = "com.first"))
-        store.record(event("second", packageName = "com.second"))
+        store.record(event("ignored", packageName = "com.second"))
 
         assertEquals(listOf("first"), store.snapshot().map { it.id })
 
         store.clearTargetPackages()
+        store.record(event("second", packageName = "com.second"))
 
         assertEquals(listOf("first", "second"), store.snapshot().map { it.id })
         assertTrue(store.targetPackagesSnapshot().isEmpty())
@@ -106,6 +121,17 @@ class TrackingEventStoreTest {
         store.clear()
 
         assertTrue(store.snapshot().isEmpty())
+    }
+
+    @Test
+    fun clear_removesObservedPackages() {
+        val store = TrackingEventStore()
+        store.record(event("first", packageName = "com.first"))
+        store.record(event("second", packageName = "com.second"))
+
+        store.clear()
+
+        assertTrue(store.observedPackagesSnapshot().isEmpty())
     }
 
     @Test

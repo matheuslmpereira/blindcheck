@@ -11,10 +11,6 @@ class TrackingEventStore {
     var isRecording: Boolean = true
         private set
 
-    @Volatile
-    var targetPackage: String? = null
-        private set
-
     @Synchronized
     fun startRecording() {
         isRecording = true
@@ -38,25 +34,21 @@ class TrackingEventStore {
     fun setTargetPackage(packageName: String?) {
         targetPackages.clear()
         packageName.normalizedPackageName()?.let(targetPackages::add)
-        syncPrimaryTargetPackage()
     }
 
     @Synchronized
     fun addTargetPackage(packageName: String?) {
         packageName.normalizedPackageName()?.let(targetPackages::add)
-        syncPrimaryTargetPackage()
     }
 
     @Synchronized
     fun removeTargetPackage(packageName: String) {
         targetPackages.remove(packageName)
-        syncPrimaryTargetPackage()
     }
 
     @Synchronized
     fun clearTargetPackages() {
         targetPackages.clear()
-        syncPrimaryTargetPackage()
     }
 
     @Synchronized
@@ -66,12 +58,14 @@ class TrackingEventStore {
         if (packageName != null) {
             observedPackages += packageName
         }
+        if (targetPackages.isNotEmpty() && packageName !in targetPackages) return
         recordedEvents += event
     }
 
     @Synchronized
     fun clear() {
         recordedEvents.clear()
+        observedPackages.clear()
     }
 
     @Synchronized
@@ -88,10 +82,6 @@ class TrackingEventStore {
 
     @Synchronized
     fun targetPackagesSnapshot(): List<String> = targetPackages.toList()
-
-    private fun syncPrimaryTargetPackage() {
-        targetPackage = targetPackages.firstOrNull()
-    }
 
     private fun String?.normalizedPackageName(): String? {
         return this?.trim()?.takeUnless { it.isBlank() }

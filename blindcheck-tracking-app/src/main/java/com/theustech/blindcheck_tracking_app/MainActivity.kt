@@ -33,6 +33,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -76,8 +78,11 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
     fun addPackageFilter(packageName: String) {
         TrackingEventStore.shared.addTargetPackage(packageName)
         manualPackage = ""
-        events = TrackingEventStore.shared.snapshot()
-        targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
+        refreshTrackingState(
+            onEventsChanged = { events = it },
+            onObservedPackagesChanged = { observedPackages = it },
+            onTargetPackagesChanged = { targetPackages = it },
+        )
     }
 
     Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
@@ -143,13 +148,19 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 targetPackages = targetPackages,
                 onRemove = { packageName ->
                     TrackingEventStore.shared.removeTargetPackage(packageName)
-                    events = TrackingEventStore.shared.snapshot()
-                    targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
+                    refreshTrackingState(
+                        onEventsChanged = { events = it },
+                        onObservedPackagesChanged = { observedPackages = it },
+                        onTargetPackagesChanged = { targetPackages = it },
+                    )
                 },
                 onClear = {
                     TrackingEventStore.shared.clearTargetPackages()
-                    events = TrackingEventStore.shared.snapshot()
-                    targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
+                    refreshTrackingState(
+                        onEventsChanged = { events = it },
+                        onObservedPackagesChanged = { observedPackages = it },
+                        onTargetPackagesChanged = { targetPackages = it },
+                    )
                 },
             )
 
@@ -166,7 +177,11 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                         val nextRecording = !isRecording
                         isRecording = nextRecording
                         TrackingEventStore.shared.setRecording(nextRecording)
-                        events = TrackingEventStore.shared.snapshot()
+                        refreshTrackingState(
+                            onEventsChanged = { events = it },
+                            onObservedPackagesChanged = { observedPackages = it },
+                            onTargetPackagesChanged = { targetPackages = it },
+                        )
                     },
                 ) {
                     Text(if (isRecording) "Stop recording" else "Start recording")
@@ -175,7 +190,11 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 Button(
                     onClick = {
                         TrackingEventStore.shared.clear()
-                        events = TrackingEventStore.shared.snapshot()
+                        refreshTrackingState(
+                            onEventsChanged = { events = it },
+                            onObservedPackagesChanged = { observedPackages = it },
+                            onTargetPackagesChanged = { targetPackages = it },
+                        )
                     },
                 ) {
                     Text("Clear")
@@ -226,6 +245,9 @@ private fun ActivePackageFilters(
             InputChip(
                 selected = true,
                 onClick = { onRemove(packageName) },
+                modifier = Modifier.semantics {
+                    contentDescription = "$packageName filter. Double tap to remove."
+                },
                 label = { Text(packageName) },
                 trailingIcon = { Text("x") },
             )
@@ -317,6 +339,16 @@ private fun TrackingEventStreamContentPreview() {
             )
         }
     }
+}
+
+private fun refreshTrackingState(
+    onEventsChanged: (List<A11yEventRecord>) -> Unit,
+    onObservedPackagesChanged: (List<String>) -> Unit,
+    onTargetPackagesChanged: (List<String>) -> Unit,
+) {
+    onEventsChanged(TrackingEventStore.shared.snapshot())
+    onObservedPackagesChanged(TrackingEventStore.shared.observedPackagesSnapshot())
+    onTargetPackagesChanged(TrackingEventStore.shared.targetPackagesSnapshot())
 }
 
 private const val EVENT_REFRESH_MS = 500L
