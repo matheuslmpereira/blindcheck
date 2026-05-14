@@ -82,4 +82,19 @@ data class FocusExpectation(
             selected != null ||
             checked != null
     }
+
+    fun describe(): String {
+        val parts = buildList {
+            textEquals?.let { add("text == \"$it\"") }
+            textContains?.let { add("text contains \"$it\"") }
+            contentDescriptionEquals?.let { add("contentDescription == \"$it\"") }
+            contentDescriptionContains?.let { add("contentDescription contains \"$it\"") }
+            clickable?.let { add("clickable == $it") }
+            editable?.let { add("editable == $it") }
+            enabled?.let { add("enabled == $it") }
+            selected?.let { add("selected == $it") }
+            checked?.let { add("checked == $it") }
+        }
+        return if (parts.isEmpty()) "any" else parts.joinToString(", ")
+    }
 }

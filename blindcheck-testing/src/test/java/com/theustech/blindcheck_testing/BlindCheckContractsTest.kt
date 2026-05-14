@@ -186,6 +186,50 @@ class BlindCheckContractsTest {
         )
     }
 
+    @Test
+    fun focusExpectation_describe_returnsHumanReadableSummary() {
+        val expectation = FocusExpectation(textContains = "Entrar", clickable = true)
+        val description = expectation.describe()
+        assertTrue(description.contains("Entrar"))
+        assertTrue(description.contains("clickable"))
+    }
+
+    @Test
+    fun focusSequenceExpectation_assertMatches_throwsWithDiagnosticMessageOnFailure() {
+        val events = listOf(
+            event("title", "Acessar conta"),
+            event("email", "E-mail", editable = true),
+        )
+        val expectation = FocusSequenceExpectation(
+            items = listOf(
+                FocusExpectation(textContains = "Acessar conta"),
+                FocusExpectation(textContains = "Entrar", clickable = true),
+            ),
+        )
+        val error = runCatching {
+            expectation.assertMatches(events, targetPackage = "com.example.app")
+        }.exceptionOrNull()
+
+        assertTrue(error is AssertionError)
+        val message = error!!.message.orEmpty()
+        assertTrue("message should mention item index", message.contains("#2"))
+        assertTrue("message should mention expected text", message.contains("Entrar"))
+        assertTrue("message should include target package", message.contains("com.example.app"))
+        assertTrue("message should include last event id", message.contains("email"))
+    }
+
+    @Test
+    fun focusSequenceExpectation_assertMatches_doesNotThrowOnSuccess() {
+        val events = listOf(
+            event("title", "Acessar conta"),
+            event("email", "E-mail", editable = true),
+        )
+        val expectation = FocusSequenceExpectation(
+            items = listOf(FocusExpectation(textContains = "Acessar conta")),
+        )
+        expectation.assertMatches(events)
+    }
+
     private fun event(
         id: String,
         text: String,
