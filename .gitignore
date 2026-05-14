@@ -32,3 +32,8 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Claude Code local state
+.claude/worktrees/
+.claude/reviews/
+.claude/*.log
