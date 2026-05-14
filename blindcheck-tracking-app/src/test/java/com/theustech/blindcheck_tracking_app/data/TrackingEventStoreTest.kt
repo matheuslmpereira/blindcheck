@@ -15,6 +15,7 @@ class TrackingEventStoreTest {
         store.record(event("missing-package", packageName = null))
 
         assertEquals(listOf("first", "second", "missing-package"), store.snapshot().map { it.id })
+        assertEquals(listOf("com.first", "com.second"), store.observedPackagesSnapshot())
     }
 
     @Test
@@ -38,6 +39,50 @@ class TrackingEventStoreTest {
         store.record(event("null-package", packageName = null))
 
         assertEquals(listOf("kept"), store.snapshot().map { it.id })
+        assertEquals(listOf("com.other", "com.target"), store.observedPackagesSnapshot())
+    }
+
+    @Test
+    fun record_appliesMultipleTargetPackageFilters() {
+        val store = TrackingEventStore()
+        store.addTargetPackage("com.first")
+        store.addTargetPackage("com.second")
+
+        store.record(event("first", packageName = "com.first"))
+        store.record(event("second", packageName = "com.second"))
+        store.record(event("ignored", packageName = "com.third"))
+
+        assertEquals(listOf("first", "second"), store.snapshot().map { it.id })
+        assertEquals(listOf("com.first", "com.second"), store.targetPackagesSnapshot())
+    }
+
+    @Test
+    fun removeTargetPackage_updatesFiltering() {
+        val store = TrackingEventStore()
+        store.addTargetPackage("com.first")
+        store.addTargetPackage("com.second")
+        store.removeTargetPackage("com.first")
+
+        store.record(event("ignored", packageName = "com.first"))
+        store.record(event("kept", packageName = "com.second"))
+
+        assertEquals(listOf("kept"), store.snapshot().map { it.id })
+        assertEquals(listOf("com.second"), store.targetPackagesSnapshot())
+    }
+
+    @Test
+    fun clearTargetPackages_returnsToShowingAllEvents() {
+        val store = TrackingEventStore()
+        store.addTargetPackage("com.first")
+        store.record(event("first", packageName = "com.first"))
+        store.record(event("second", packageName = "com.second"))
+
+        assertEquals(listOf("first"), store.snapshot().map { it.id })
+
+        store.clearTargetPackages()
+
+        assertEquals(listOf("first", "second"), store.snapshot().map { it.id })
+        assertTrue(store.targetPackagesSnapshot().isEmpty())
     }
 
     @Test
