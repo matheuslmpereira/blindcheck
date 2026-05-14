@@ -292,6 +292,8 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 }
             }
 
+            var newestFirst by remember { mutableStateOf(true) }
+
             HorizontalDivider()
 
             // Recording controls
@@ -316,17 +318,30 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 }
             }
 
-            Text(
-                text = "${events.size} events · ${observedPackages.size} apps seen",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${events.size} events · ${observedPackages.size} apps seen",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                TextButton(onClick = { newestFirst = !newestFirst }) {
+                    Text(
+                        text = if (newestFirst) "Newest first" else "Oldest first",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
 
+            val sortedEvents = if (newestFirst) events.reversed() else events
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(events, key = { event -> event.id }) { event ->
+                items(sortedEvents, key = { event -> event.id }) { event ->
                     EventRecordRow(event = event)
                     HorizontalDivider()
                 }
