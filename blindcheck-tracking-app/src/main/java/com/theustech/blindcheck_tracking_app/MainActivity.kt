@@ -221,7 +221,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             }
 
             Text(
-                text = "Captured events: ${events.size} | Apps observed: ${observedPackages.size}",
+                text = "Captured events: ${events.size} | Packages seen: ${observedPackages.size}",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
             )
