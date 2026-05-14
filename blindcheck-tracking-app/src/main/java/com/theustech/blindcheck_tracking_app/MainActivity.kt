@@ -1,6 +1,9 @@
 package com.theustech.blindcheck_tracking_app
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -33,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +44,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.theustech.blindcheck_testing.model.A11yEventRecord
 import com.theustech.blindcheck_tracking_app.data.TrackingEventStore
+import com.theustech.blindcheck_tracking_app.data.TrackingServiceStatus
 import com.theustech.blindcheck_tracking_app.ui.theme.BlindchecktesteappTheme
 import kotlinx.coroutines.delay
 
@@ -58,9 +63,13 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     var manualPackage by remember { mutableStateOf("") }
     var isPackageMenuExpanded by remember { mutableStateOf(false) }
     var isRecording by remember { mutableStateOf(TrackingEventStore.shared.isRecording) }
+    var isTrackingServiceEnabled by remember {
+        mutableStateOf(readTrackingServiceEnabled(context))
+    }
     var events by remember { mutableStateOf(TrackingEventStore.shared.snapshot()) }
     var observedPackages by remember { mutableStateOf(TrackingEventStore.shared.observedPackagesSnapshot()) }
     var targetPackages by remember { mutableStateOf(TrackingEventStore.shared.targetPackagesSnapshot()) }
@@ -68,6 +77,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) {
         while (true) {
             isRecording = TrackingEventStore.shared.isRecording
+            isTrackingServiceEnabled = readTrackingServiceEnabled(context)
             events = TrackingEventStore.shared.snapshot()
             observedPackages = TrackingEventStore.shared.observedPackagesSnapshot()
             targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
@@ -97,6 +107,13 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 text = "BlindCheck event stream",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
+            )
+
+            TrackingServiceStatusMessage(
+                isEnabled = isTrackingServiceEnabled,
+                onOpenSettings = {
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                },
             )
 
             OutlinedTextField(
@@ -221,6 +238,37 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun TrackingServiceStatusMessage(
+    isEnabled: Boolean,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = if (isEnabled) {
+                "BlindCheck accessibility service enabled"
+            } else {
+                "BlindCheck accessibility service is off"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
+        if (!isEnabled) {
+            Text(
+                text = "Enable the BlindCheck service, not only TalkBack, to capture accessibility events.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Button(onClick = onOpenSettings) {
+                Text("Open accessibility settings")
+            }
+        }
+    }
+}
+
+@Composable
 private fun ActivePackageFilters(
     targetPackages: List<String>,
     onRemove: (String) -> Unit,
@@ -314,6 +362,10 @@ private fun TrackingEventStreamContentPreview() {
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
+            TrackingServiceStatusMessage(
+                isEnabled = false,
+                onOpenSettings = {},
+            )
             OutlinedTextField(
                 value = "com.example.app",
                 onValueChange = {},
@@ -339,6 +391,14 @@ private fun TrackingEventStreamContentPreview() {
             )
         }
     }
+}
+
+private fun readTrackingServiceEnabled(context: Context): Boolean {
+    val enabledServices = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+    )
+    return TrackingServiceStatus.isTrackingServiceEnabled(enabledServices)
 }
 
 private fun refreshTrackingState(
