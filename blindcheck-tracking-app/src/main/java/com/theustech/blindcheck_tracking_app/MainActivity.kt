@@ -30,6 +30,9 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -294,6 +297,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             }
 
             var newestFirst by remember { mutableStateOf(true) }
+            val sortedEvents = if (newestFirst) events.reversed() else events
 
             HorizontalDivider()
 
@@ -317,6 +321,29 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 ) {
                     Text("Reset")
                 }
+                OutlinedButton(
+                    enabled = events.isNotEmpty(),
+                    onClick = {
+                        val dump = buildEventDump(
+                            events = sortedEvents,
+                            targetPackages = targetPackages,
+                            targetEventTypes = targetEventTypes,
+                            newestFirst = newestFirst,
+                        )
+                        context.startActivity(
+                            Intent.createChooser(
+                                Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_SUBJECT, "BlindCheck event dump")
+                                    putExtra(Intent.EXTRA_TEXT, dump)
+                                },
+                                "Share event dump",
+                            ),
+                        )
+                    },
+                ) {
+                    Text("Share")
+                }
             }
 
             Row(
@@ -337,7 +364,6 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 }
             }
 
-            val sortedEvents = if (newestFirst) events.reversed() else events
             val listState = rememberLazyListState()
             LaunchedEffect(newestFirst) { listState.scrollToItem(0) }
             LaunchedEffect(events.size) {
@@ -500,6 +526,48 @@ private fun readTrackingServiceEnabled(context: Context): Boolean {
                 serviceClassName = service.resolveInfo?.serviceInfo?.name,
             )
         }
+}
+
+private fun buildEventDump(
+    events: List<A11yEventRecord>,
+    targetPackages: List<String>,
+    targetEventTypes: List<AccessibilityEventType>,
+    newestFirst: Boolean,
+): String {
+    val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+    return buildString {
+        appendLine("BlindCheck Event Dump")
+        appendLine("Generated: $timestamp")
+        appendLine("Events: ${events.size} | Order: ${if (newestFirst) "Newest first" else "Oldest first"}")
+        if (targetPackages.isNotEmpty()) {
+            appendLine("Package filters: ${targetPackages.joinToString()}")
+        }
+        if (targetEventTypes.isNotEmpty()) {
+            appendLine("Event type filters: ${targetEventTypes.joinToString { it.label }}")
+        }
+        appendLine()
+        events.forEach { event ->
+            val typeLabel = AccessibilityEventType.fromAndroidName(event.eventType)?.label
+                ?: event.eventType
+            appendLine("${event.timestamp} · ${event.packageName.orEmpty()} · $typeLabel")
+            if (event.text.isNotEmpty()) {
+                appendLine("  Text: ${event.text.joinToString(" | ")}")
+            }
+            if (!event.contentDescription.isNullOrBlank()) {
+                appendLine("  Description: ${event.contentDescription}")
+            }
+            event.sourceNode?.let { node ->
+                val states = buildList {
+                    if (node.focused) add("focused")
+                    if (node.clickable) add("clickable")
+                    if (node.editable) add("editable")
+                    if (!node.enabled) add("disabled")
+                }.joinToString(", ").ifBlank { "enabled" }
+                appendLine("  State: $states")
+            }
+            appendLine()
+        }
+    }.trimEnd()
 }
 
 private const val EVENT_REFRESH_MS = 500L
