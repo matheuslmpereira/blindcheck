@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -337,7 +338,10 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             }
 
             val sortedEvents = if (newestFirst) events.reversed() else events
+            val listState = rememberLazyListState()
+            LaunchedEffect(newestFirst) { listState.scrollToItem(0) }
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
