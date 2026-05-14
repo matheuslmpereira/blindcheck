@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.theustech.blindcheck_testeapp.ui.theme.BlindchecktesteappTheme
 
-private val deterministicFruits = listOf(
+internal val deterministicFruits = listOf(
     Fruit("Banana", "Fruta amarela, doce e facil de descascar."),
     Fruit("Laranja", "Fruta citrica com gomos e bastante suco."),
     Fruit("Uva", "Fruta pequena que cresce em cachos."),
@@ -249,14 +250,9 @@ fun FruitDetailScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = "Voltar",
-            modifier = Modifier
-                .clickable(onClick = onBack)
-                .padding(vertical = 8.dp),
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold,
-        )
+        TextButton(onClick = onBack) {
+            Text("Voltar")
+        }
 
         Box(
             modifier = Modifier
