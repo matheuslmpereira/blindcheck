@@ -11,11 +11,11 @@ class AndroidUserAccessibilityActions(
     private val uiDevice: UiDevice = UiDevice.getInstance(instrumentation),
 ) : UserAccessibilityActions {
     override suspend fun next() {
-        unsupported("next")
+        moveFocus(forward = true)
     }
 
     override suspend fun previous() {
-        unsupported("previous")
+        moveFocus(forward = false)
     }
 
     override suspend fun activate() {
@@ -31,11 +31,21 @@ class AndroidUserAccessibilityActions(
     }
 
     override suspend fun scrollForward() {
-        unsupported("scrollForward")
+        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return
+        root.useNode { node ->
+            node.findFirstScrollable()?.useNode { scrollable ->
+                scrollable.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+            }
+        }
     }
 
     override suspend fun scrollBackward() {
-        unsupported("scrollBackward")
+        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return
+        root.useNode { node ->
+            node.findFirstScrollable()?.useNode { scrollable ->
+                scrollable.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+            }
+        }
     }
 
     override suspend fun inputText(value: String) {
@@ -64,19 +74,60 @@ class AndroidUserAccessibilityActions(
         uiDevice.pressBack()
     }
 
+    private fun moveFocus(forward: Boolean) {
+        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return
+        val candidates = mutableListOf<AccessibilityNodeInfo>()
+
+        fun traverse(node: AccessibilityNodeInfo) {
+            if (isAccessibilityFocusable(node)) {
+                candidates.add(AccessibilityNodeInfo.obtain(node))
+            }
+            for (i in 0 until node.childCount) {
+                val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
+                try { traverse(child) } finally { child.recycle() }
+            }
+        }
+
+        try {
+            root.useNode { traverse(it) }
+            if (candidates.isEmpty()) return
+
+            val focusedIdx = candidates.indexOfFirst { it.isAccessibilityFocused }
+            val targetIdx = when {
+                forward && focusedIdx < 0 -> 0
+                forward -> (focusedIdx + 1).coerceAtMost(candidates.size - 1)
+                focusedIdx <= 0 -> candidates.size - 1
+                else -> focusedIdx - 1
+            }
+            candidates[targetIdx].performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
+        } finally {
+            candidates.forEach { runCatching { it.recycle() } }
+        }
+    }
+
+    private fun isAccessibilityFocusable(node: AccessibilityNodeInfo): Boolean {
+        return !node.text.isNullOrBlank() ||
+            !node.contentDescription.isNullOrBlank() ||
+            node.isClickable ||
+            node.isEditable
+    }
+
+    private fun AccessibilityNodeInfo.findFirstScrollable(): AccessibilityNodeInfo? {
+        if (isScrollable) return AccessibilityNodeInfo.obtain(this)
+        for (i in 0 until childCount) {
+            val child = runCatching { getChild(i) }.getOrNull() ?: continue
+            val result = child.useNode { it.findFirstScrollable() }
+            if (result != null) return result
+        }
+        return null
+    }
+
     private fun findFocusedNode(): AccessibilityNodeInfo? {
         val root = instrumentation.uiAutomation.rootInActiveWindow ?: return null
         return root.useNode { node ->
             node.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
                 ?: node.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         }
-    }
-
-    private fun unsupported(actionName: String): Nothing {
-        throw UnsupportedOperationException(
-            "UserAccessibilityActions.$actionName is not implemented in this BlindCheck testing slice. " +
-                "This slice supports activate, inputText, and back only.",
-        )
     }
 
     private inline fun <T> AccessibilityNodeInfo.useNode(block: (AccessibilityNodeInfo) -> T): T {

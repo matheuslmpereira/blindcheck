@@ -64,6 +64,21 @@ class AndroidAccessibilityTestDriver(
         }
     }
 
+    fun assertFocused(expectation: FocusExpectation) {
+        val matched = waitUntil {
+            currentWindowSnapshots()
+                .flatMap { it.flattenPreOrder() }
+                .filter { it.focused }
+                .any(expectation::matches)
+        }
+        if (!matched) {
+            throw AssertionError(
+                "Expected the focused accessibility node to match [${expectation.describe()}], " +
+                    "but no focused node matched.",
+            )
+        }
+    }
+
     fun focusFirst(expectation: FocusExpectation): Boolean {
         val root = instrumentation.uiAutomation.rootInActiveWindow ?: return false
         return root.useNode { node ->

@@ -10,7 +10,6 @@ import com.theustech.blindcheck_testing.assertions.FeedbackExpectation
 import com.theustech.blindcheck_testing.assertions.FocusExpectation
 import com.theustech.blindcheck_testing.assertions.FocusSequenceExpectation
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 
@@ -170,38 +169,6 @@ class BlindCheckTestingIntegrationTest {
 
         composeRule.onNodeWithText("Frutas").assertIsDisplayed()
         driver.assertCurrentWindowContains(FocusExpectation(textContains = "Frutas"))
-    }
-
-    // endregion
-
-    // region AndroidUserAccessibilityActions unsupported operations
-
-    @Test
-    fun actions_next_throwsUnsupportedOperationException() = runTest {
-        assertThrows(UnsupportedOperationException::class.java) {
-            kotlinx.coroutines.runBlocking { driver.actions().next() }
-        }
-    }
-
-    @Test
-    fun actions_previous_throwsUnsupportedOperationException() = runTest {
-        assertThrows(UnsupportedOperationException::class.java) {
-            kotlinx.coroutines.runBlocking { driver.actions().previous() }
-        }
-    }
-
-    @Test
-    fun actions_scrollForward_throwsUnsupportedOperationException() = runTest {
-        assertThrows(UnsupportedOperationException::class.java) {
-            kotlinx.coroutines.runBlocking { driver.actions().scrollForward() }
-        }
-    }
-
-    @Test
-    fun actions_scrollBackward_throwsUnsupportedOperationException() = runTest {
-        assertThrows(UnsupportedOperationException::class.java) {
-            kotlinx.coroutines.runBlocking { driver.actions().scrollBackward() }
-        }
     }
 
     // endregion
