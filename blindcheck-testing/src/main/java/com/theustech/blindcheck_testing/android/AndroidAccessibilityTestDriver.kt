@@ -23,7 +23,7 @@ class AndroidAccessibilityTestDriver(
         }
     }
 
-    fun currentWindowEvents(eventType: String = WINDOW_SNAPSHOT_EVENT_TYPE): List<A11yEventRecord> {
+    fun currentWindowEvents(eventType: String = SYNTHETIC_SNAPSHOT_EVENT_TYPE): List<A11yEventRecord> {
         return currentWindowSnapshots().flatMap { it.flattenPreOrder() }.mapIndexed { index, node ->
             A11yEventRecord(
                 id = "window-node-$index",
@@ -96,14 +96,10 @@ class AndroidAccessibilityTestDriver(
 
     private fun currentWindowSnapshots(): List<A11yNodeSnapshot> {
         instrumentation.waitForIdleSync()
-        val activeRoot = instrumentation.uiAutomation.rootInActiveWindow
-        val activeSnapshot = activeRoot?.useNode(nodeMapper::map)
-
-        val windowSnapshots = instrumentation.uiAutomation.windows
+        return instrumentation.uiAutomation.windows
+            .sortedByDescending { it.isActive }
             .mapNotNull { window -> runCatching { window.root }.getOrNull() }
             .mapNotNull { root -> root.useNode(nodeMapper::map) }
-
-        return listOfNotNull(activeSnapshot) + windowSnapshots
     }
 
     private fun waitUntil(
@@ -138,7 +134,7 @@ class AndroidAccessibilityTestDriver(
     }
 
     companion object {
-        const val WINDOW_SNAPSHOT_EVENT_TYPE = "TYPE_WINDOW_CONTENT_CHANGED"
+        const val SYNTHETIC_SNAPSHOT_EVENT_TYPE = "TYPE_SYNTHETIC_WINDOW_SNAPSHOT"
         private const val DEFAULT_ASSERTION_TIMEOUT_MS = 2_000L
         private const val DEFAULT_ASSERTION_POLL_INTERVAL_MS = 50L
 

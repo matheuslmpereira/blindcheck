@@ -25,7 +25,7 @@ class AndroidAccessibilityNodeMapper(
 
         val children = node.childSnapshots(depth, remainingNodes)
         return A11yNodeSnapshot(
-            text = node.text.normalizedString() ?: children.firstDescendantText(),
+            text = node.text.normalizedString(),
             contentDescription = node.contentDescription.normalizedString(),
             className = node.className.normalizedString(),
             viewIdResourceName = node.viewIdResourceName.normalizedString(),
@@ -73,14 +73,6 @@ class AndroidAccessibilityNodeMapper(
 
     private fun CharSequence?.normalizedString(): String? {
         return this?.toString()?.trim()?.takeUnless { it.isBlank() }
-    }
-
-    private fun List<A11yNodeSnapshot>.firstDescendantText(): String? {
-        for (child in this) {
-            child.text?.let { return it }
-            child.children.firstDescendantText()?.let { return it }
-        }
-        return null
     }
 
     private class RemainingNodes(private var remaining: Int) {

@@ -10,6 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -72,6 +73,24 @@ class AndroidAccessibilityNodeMapperTest {
         assertNull(snapshot.text)
         assertNull(snapshot.contentDescription)
         assertEquals("android.widget.TextView", snapshot.className)
+    }
+
+    @Test
+    fun map_containerWithoutTextHasNullText_evenWhenChildrenHaveText() {
+        val child = AccessibilityNodeInfo.obtain().apply {
+            text = "Child text"
+            className = "android.widget.TextView"
+        }
+        val parent = AccessibilityNodeInfo.obtain().apply {
+            className = "android.widget.LinearLayout"
+        }
+        shadowOf(parent).addChild(child)
+
+        val snapshot = parent.useNode { mapper.map(it) }!!
+
+        assertNull("Container node must not inherit text from children", snapshot.text)
+        assertEquals("Child text", snapshot.children.first().text)
+        child.recycle()
     }
 
     private inline fun <T> AccessibilityNodeInfo.useNode(block: (AccessibilityNodeInfo) -> T): T {
