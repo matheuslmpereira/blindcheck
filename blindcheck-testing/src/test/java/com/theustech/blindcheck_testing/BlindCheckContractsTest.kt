@@ -13,6 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.coroutines.startCoroutine
 
 class BlindCheckContractsTest {
     @Test
@@ -230,6 +231,30 @@ class BlindCheckContractsTest {
         expectation.assertMatches(events)
     }
 
+    @Test
+    fun unsupportedUserAccessibilityActions_throwClearMessages() {
+        val actions = object : UserAccessibilityActions {
+            override suspend fun next() = unsupported("next")
+            override suspend fun previous() = unsupported("previous")
+            override suspend fun activate() = Unit
+            override suspend fun scrollForward() = unsupported("scrollForward")
+            override suspend fun scrollBackward() = unsupported("scrollBackward")
+            override suspend fun inputText(value: String) = Unit
+            override suspend fun back() = Unit
+
+            private fun unsupported(actionName: String): Nothing {
+                throw UnsupportedOperationException(
+                    "UserAccessibilityActions.$actionName is not implemented in this BlindCheck testing slice.",
+                )
+            }
+        }
+
+        val error = runCatching { runSuspend { actions.next() } }.exceptionOrNull()
+
+        assertTrue(error is UnsupportedOperationException)
+        assertTrue(error!!.message.orEmpty().contains("UserAccessibilityActions.next"))
+    }
+
     private fun event(
         id: String,
         text: String,
@@ -248,5 +273,19 @@ class BlindCheckContractsTest {
                 enabled = true,
             ),
         )
+    }
+
+    private fun runSuspend(block: suspend () -> Unit) {
+        var failure: Throwable? = null
+        block.startCoroutine(
+            object : kotlin.coroutines.Continuation<Unit> {
+                override val context = kotlin.coroutines.EmptyCoroutineContext
+
+                override fun resumeWith(result: Result<Unit>) {
+                    failure = result.exceptionOrNull()
+                }
+            },
+        )
+        failure?.let { throw it }
     }
 }

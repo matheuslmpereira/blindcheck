@@ -1,6 +1,7 @@
 package com.theustech.blindcheck_testeapp
 
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -107,6 +108,12 @@ fun BlindCheckMockupApp() {
                 fruit = currentScreen.fruit,
                 onBack = { screen = MockupScreen.FruitList },
             )
+        }
+    }
+
+    if (screen is MockupScreen.FruitDetail) {
+        BackHandler {
+            screen = MockupScreen.FruitList
         }
     }
 }
