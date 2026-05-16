@@ -54,9 +54,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.theustech.blindcheck_testing.model.A11yEventRecord
-import com.theustech.blindcheck_tracking_app.data.AccessibilityEventType
-import com.theustech.blindcheck_tracking_app.data.TrackingEventStore
-import com.theustech.blindcheck_tracking_app.data.TrackingServiceStatus
+import com.theustech.blindcheck_tracker.AccessibilityEventType
+import com.theustech.blindcheck_tracker.TrackingEventStore
+import com.theustech.blindcheck_tracker.TrackingServiceStatus
 import com.theustech.blindcheck_tracking_app.ui.theme.BlindchecktesteappTheme
 import kotlinx.coroutines.delay
 

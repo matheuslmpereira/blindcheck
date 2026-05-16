@@ -23,3 +23,4 @@ rootProject.name = "blindcheck-testeapp"
 include(":blindcheck-test-app")
 include(":blindcheck-tracking-app")
 include(":blindcheck-testing")
+include(":blindcheck-tracker")
