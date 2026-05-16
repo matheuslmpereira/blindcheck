@@ -1,18 +1,32 @@
 ADB=adb
-TRACKING_SERVICE=com.theustech.blindcheck.tracker/.TrackingAccessibilityService
+TRACKING_PKG=com.theustech.blindcheck_tracking_app
+TRACKING_SERVICE=$(TRACKING_PKG)/.TrackingAccessibilityService
+TEST_APP_PKG=com.theustech.blindcheck_testeapp
 
 .PHONY: devices
 devices:
 	$(ADB) devices
 
+## Builds + installs both apps, enables the tracker service, opens the test app, launches desktop remote
+.PHONY: session
+session: install-all enable-tracker open-test-app desktop
+
 .PHONY: install-all
 install-all:
-	./gradlew :tracking-app:installDebug :mockup-test-app:installDebug
+	./gradlew :blindcheck-tracking-app:installDebug :blindcheck-test-app:installDebug
 
 .PHONY: enable-tracker
 enable-tracker:
 	$(ADB) shell settings put secure enabled_accessibility_services $(TRACKING_SERVICE)
 	$(ADB) shell settings put secure accessibility_enabled 1
+
+.PHONY: open-test-app
+open-test-app:
+	$(ADB) shell monkey -p $(TEST_APP_PKG) -c android.intent.category.LAUNCHER 1
+
+.PHONY: desktop
+desktop:
+	./gradlew :blindcheck-desktop:run &
 
 .PHONY: disable-a11y
 disable-a11y:
