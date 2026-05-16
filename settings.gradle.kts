@@ -7,6 +7,7 @@ pluginManagement {
                 includeGroupByRegex("androidx.*")
             }
         }
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
         mavenCentral()
         gradlePluginPortal()
     }
@@ -24,3 +25,4 @@ include(":blindcheck-test-app")
 include(":blindcheck-tracking-app")
 include(":blindcheck-testing")
 include(":blindcheck-tracker")
+include(":blindcheck-desktop")
