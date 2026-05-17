@@ -25,12 +25,12 @@ class RemoteActionReceiverTest {
 
     @Before
     fun setUp() {
-        TrackingAccessibilityService.executor = fakeExecutor
+        TrackingAccessibilityService.setExecutorForTest(fakeExecutor)
     }
 
     @After
     fun tearDown() {
-        TrackingAccessibilityService.executor = null
+        TrackingAccessibilityService.setExecutorForTest(null)
         executedActions.clear()
     }
 
@@ -84,7 +84,7 @@ class RemoteActionReceiverTest {
 
     @Test
     fun `broadcast with no executor does not crash`() {
-        TrackingAccessibilityService.executor = null
+        TrackingAccessibilityService.setExecutorForTest(null)
         receiver.onReceive(context, Intent(RemoteActions.ACTION_NEXT))
         assertTrue(executedActions.isEmpty())
     }

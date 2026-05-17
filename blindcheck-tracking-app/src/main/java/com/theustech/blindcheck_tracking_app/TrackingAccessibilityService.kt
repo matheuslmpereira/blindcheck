@@ -1,6 +1,7 @@
 package com.theustech.blindcheck_tracking_app
 
 import android.accessibilityservice.AccessibilityService
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.theustech.blindcheck_tracker.A11yEventNormalizer
@@ -31,6 +32,7 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
     override fun onInterrupt() = Unit
 
     override fun execute(action: String) {
+        Log.d(TAG, "Executing remote action: $action")
         when (action) {
             RemoteActions.ACTION_NEXT -> moveFocus(forward = true)
             RemoteActions.ACTION_PREVIOUS -> moveFocus(forward = false)
@@ -111,11 +113,17 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
     }
 
     companion object {
+        private const val TAG = "BlindCheckTracker"
+
         @Volatile
         var instance: TrackingAccessibilityService? = null
             private set
 
         @Volatile
         internal var executor: ActionExecutor? = null
+
+        fun setExecutorForTest(e: ActionExecutor?) {
+            executor = e
+        }
     }
 }
