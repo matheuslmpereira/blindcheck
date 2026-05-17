@@ -7,17 +7,19 @@ import com.theustech.blindcheck_tracker.A11yEventNormalizer
 import com.theustech.blindcheck_tracker.RemoteActions
 import com.theustech.blindcheck_tracker.TrackingEventStore
 
-class TrackingAccessibilityService : AccessibilityService() {
+class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
 
     private val normalizer = A11yEventNormalizer()
     private val eventStore = TrackingEventStore.shared
 
     override fun onServiceConnected() {
         instance = this
+        executor = this
     }
 
     override fun onDestroy() {
         instance = null
+        executor = null
         super.onDestroy()
     }
 
@@ -28,7 +30,7 @@ class TrackingAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
-    fun execute(action: String) {
+    override fun execute(action: String) {
         when (action) {
             RemoteActions.ACTION_NEXT -> moveFocus(forward = true)
             RemoteActions.ACTION_PREVIOUS -> moveFocus(forward = false)
@@ -112,5 +114,8 @@ class TrackingAccessibilityService : AccessibilityService() {
         @Volatile
         var instance: TrackingAccessibilityService? = null
             private set
+
+        @Volatile
+        internal var executor: ActionExecutor? = null
     }
 }

@@ -9,7 +9,7 @@ class RemoteActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         if (action !in SUPPORTED_ACTIONS) return
-        TrackingAccessibilityService.instance?.execute(action)
+        TrackingAccessibilityService.executor?.execute(action)
     }
 
     companion object {
