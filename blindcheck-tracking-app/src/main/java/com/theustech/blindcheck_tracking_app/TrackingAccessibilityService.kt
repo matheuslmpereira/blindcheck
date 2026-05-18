@@ -1,6 +1,8 @@
 package com.theustech.blindcheck_tracking_app
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -53,6 +55,7 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
             RemoteActions.ACTION_SCROLL_BACKWARD -> scrollFocused(forward = false)
             RemoteActions.ACTION_HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
             RemoteActions.ACTION_RECENTS -> performGlobalAction(GLOBAL_ACTION_RECENTS)
+            RemoteActions.ACTION_SWIPE_UP -> performSwipeUp()
         }
     }
 
@@ -140,6 +143,20 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
                 scrollable.performAction(action)
             }
         }
+    }
+
+    private fun performSwipeUp() {
+        val metrics = resources.displayMetrics
+        val cx = metrics.widthPixels / 2f
+        // Slow drag from 80 % height to 20 % height — matches the app-drawer gesture speed
+        val path = Path().apply {
+            moveTo(cx, metrics.heightPixels * 0.8f)
+            lineTo(cx, metrics.heightPixels * 0.2f)
+        }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0L, 600L))
+            .build()
+        dispatchGesture(gesture, null, null)
     }
 
     // For Compose apps: respects semantic merging (excludes e.g. TextField labels merged into parent).
