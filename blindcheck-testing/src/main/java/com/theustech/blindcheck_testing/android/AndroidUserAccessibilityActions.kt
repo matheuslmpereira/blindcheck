@@ -78,25 +78,29 @@ class AndroidUserAccessibilityActions(
     }
 
     private fun moveFocus(forward: Boolean) {
-        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return
+        val automation = instrumentation.uiAutomation
         val candidates = mutableListOf<AccessibilityNodeInfo>()
 
-        // When a node is focusable, stop descending — children belong to that node's semantics.
-        fun traverse(node: AccessibilityNodeInfo) {
-            if (isAccessibilityFocusable(node)) {
+        fun traverse(node: AccessibilityNodeInfo, filter: (AccessibilityNodeInfo) -> Boolean) {
+            if (filter(node)) {
                 candidates.add(AccessibilityNodeInfo.obtain(node))
                 return
             }
             for (i in 0 until node.childCount) {
                 val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
-                try { traverse(child) } finally { child.recycle() }
+                try { traverse(child, filter) } finally { child.recycle() }
             }
         }
 
         val currentIdx = lastFocusedIdx
 
         try {
-            root.useNode { traverse(it) }
+            // Pass 1: isScreenReaderFocusable (Compose apps)
+            (automation.rootInActiveWindow ?: return).useNode { traverse(it, ::isScreenReaderFocusable) }
+            // Pass 2: ACTION_ACCESSIBILITY_FOCUS heuristic (system/traditional apps)
+            if (candidates.isEmpty()) {
+                (automation.rootInActiveWindow ?: return).useNode { traverse(it, ::isActionFocusable) }
+            }
             if (candidates.isEmpty()) return
 
             val focusedIdx = if (currentIdx < 0 || currentIdx >= candidates.size) -1 else currentIdx
@@ -113,10 +117,14 @@ class AndroidUserAccessibilityActions(
         }
     }
 
-    private fun isAccessibilityFocusable(node: AccessibilityNodeInfo): Boolean {
-        if (!node.isVisibleToUser) return false
-        return AccessibilityNodeInfoCompat.wrap(node).isScreenReaderFocusable
-    }
+    private fun isScreenReaderFocusable(node: AccessibilityNodeInfo): Boolean =
+        node.isVisibleToUser && AccessibilityNodeInfoCompat.wrap(node).isScreenReaderFocusable
+
+    private fun isActionFocusable(node: AccessibilityNodeInfo): Boolean =
+        node.isVisibleToUser &&
+            node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS } &&
+            (!node.text.isNullOrBlank() || !node.contentDescription.isNullOrBlank() ||
+                node.isEditable || node.isClickable)
 
     private fun AccessibilityNodeInfo.findFirstScrollable(): AccessibilityNodeInfo? {
         if (isScrollable) return AccessibilityNodeInfo.obtain(this)

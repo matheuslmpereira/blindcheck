@@ -33,6 +33,11 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         eventStore.record(normalizer.normalize(event))
+        // Reset focus index on window transitions so navigation always starts fresh
+        // when the user switches apps or screens.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            lastFocusedIdx = -1
+        }
     }
 
     override fun onInterrupt() = Unit
@@ -50,25 +55,32 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
     }
 
     private fun moveFocus(forward: Boolean) {
-        val root = rootInActiveWindow ?: return
         val candidates = mutableListOf<AccessibilityNodeInfo>()
 
-        // When a node is focusable, stop descending — children belong to that node's semantics.
-        fun traverse(node: AccessibilityNodeInfo) {
-            if (isAccessibilityFocusable(node)) {
+        fun traverse(node: AccessibilityNodeInfo, filter: (AccessibilityNodeInfo) -> Boolean) {
+            if (filter(node)) {
                 candidates.add(AccessibilityNodeInfo.obtain(node))
                 return
             }
             for (i in 0 until node.childCount) {
                 val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
-                try { traverse(child) } finally { child.recycle() }
+                try { traverse(child, filter) } finally { child.recycle() }
             }
         }
 
         val currentIdx = lastFocusedIdx
 
         try {
-            root.useNode { traverse(it) }
+            // Pass 1: isScreenReaderFocusable — Compose apps use this to exclude merged
+            // children (e.g. TextField label) from independent screen-reader focus.
+            (rootInActiveWindow ?: return).useNode { traverse(it, ::isScreenReaderFocusable) }
+
+            // Pass 2: system/traditional apps don't set isScreenReaderFocusable, so fall
+            // back to ACTION_ACCESSIBILITY_FOCUS + content heuristic.
+            if (candidates.isEmpty()) {
+                (rootInActiveWindow ?: return).useNode { traverse(it, ::isActionFocusable) }
+            }
+
             if (candidates.isEmpty()) {
                 Log.w(TAG, "moveFocus: no focusable candidates found")
                 return
@@ -128,14 +140,16 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
         }
     }
 
-    private fun isAccessibilityFocusable(node: AccessibilityNodeInfo): Boolean {
-        if (!node.isVisibleToUser) return false
-        // isScreenReaderFocusable matches TalkBack's node-selection logic: it respects
-        // semantic merging (e.g. TextField label merged into parent) that ACTION_ACCESSIBILITY_FOCUS
-        // alone does not capture.
-        val compat = AccessibilityNodeInfoCompat.wrap(node)
-        return compat.isScreenReaderFocusable
-    }
+    // For Compose apps: respects semantic merging (excludes e.g. TextField labels merged into parent).
+    private fun isScreenReaderFocusable(node: AccessibilityNodeInfo): Boolean =
+        node.isVisibleToUser && AccessibilityNodeInfoCompat.wrap(node).isScreenReaderFocusable
+
+    // For system/traditional apps: ACTION_ACCESSIBILITY_FOCUS + content heuristic.
+    private fun isActionFocusable(node: AccessibilityNodeInfo): Boolean =
+        node.isVisibleToUser &&
+            node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS } &&
+            (!node.text.isNullOrBlank() || !node.contentDescription.isNullOrBlank() ||
+                node.isEditable || node.isClickable)
 
     private fun findFirstScrollable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
         if (node.isScrollable) return AccessibilityNodeInfo.obtain(node)
