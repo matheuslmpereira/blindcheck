@@ -1,308 +1,341 @@
-# BlindCheck — Arquitetura do Sistema
+# BlindCheck — Guia de uso
 
-BlindCheck é uma plataforma de testes de acessibilidade para Android voltada a usuários cegos. Ela valida a camada de acessibilidade observável: eventos, foco, content descriptions, estados e ações — da forma como um usuário de TalkBack os experimenta.
+BlindCheck responde a uma pergunta prática: **um usuário cego consegue entender, navegar e completar os fluxos do seu app?**
+
+Para isso, a lib valida a camada de acessibilidade observável — eventos, foco, content descriptions, estados e ações — da forma exata que o TalkBack os interpreta. Não é um teste de UI visual: é um teste da experiência de quem usa o olhar dos dedos.
 
 ---
 
-## Módulos
+## Instalação
 
-```mermaid
-graph TD
-    subgraph Android["Android (device)"]
-        TApp["blindcheck-test-app\nApp de exemplo\n(alvo dos testes)"]
-        TrkApp["blindcheck-tracking-app\nApp de monitoramento\n(UI do event stream)"]
+Adicione a dependência no módulo onde ficam seus testes instrumentados:
 
-        subgraph Libs["Bibliotecas Android"]
-            Interactor["blindcheck-interactor\nAccessibilityService\n+ BroadcastReceiver"]
-            Tracker["blindcheck-tracker\nNormalização de eventos\n+ TrackingEventStore"]
-            Testing["blindcheck-testing\nModelos, asserções\n+ UserAccessibilityActions"]
-        end
-    end
-
-    Desktop["blindcheck-desktop\nRemote control UI\n(JVM/Compose Desktop)"]
-
-    TrkApp --> Interactor
-    TrkApp --> Tracker
-    Interactor --> Tracker
-    Tracker --> Testing
-    TApp -.->|androidTestImplementation| Testing
-
-    Desktop -.->|"ADB broadcast"| TrkApp
+```kotlin
+// app/build.gradle.kts
+dependencies {
+    androidTestImplementation(project(":blindcheck-testing"))
+}
 ```
 
-> Linhas sólidas = dependência de compilação. Linha tracejada do Desktop = chamada de processo (ADB).
+Se estiver consumindo como artefato publicado (ainda não disponível), o grupo será `com.theustech`.
 
 ---
 
-## Responsabilidade de cada módulo
+## Conceito central
 
-| Módulo | Tipo | Responsabilidade |
-|---|---|---|
-| `blindcheck-testing` | Android lib | Modelos de dados imutáveis, interface `UserAccessibilityActions`, asserções de foco, driver de teste |
-| `blindcheck-tracker` | Android lib | Normalização de `AccessibilityEvent`/`NodeInfo`, `TrackingEventStore`, constantes de ação remota |
-| `blindcheck-interactor` | Android lib | `TrackingAccessibilityService`, `RemoteActionReceiver`, injeção de gestos |
-| `blindcheck-tracking-app` | Aplicativo | UI Compose para stream de eventos em tempo real, filtros, exportação |
-| `blindcheck-test-app` | Aplicativo | App de exemplo determinístico (Login → Lista de Frutas → Detalhe) |
-| `blindcheck-desktop` | JVM Desktop | Remote control com botões que disparam broadcasts via ADB |
+Toda interação parte de dois objetos criados no seu teste:
 
----
-
-## Modelos de dados centrais
-
-```mermaid
-classDiagram
-    class A11yEventRecord {
-        +String id
-        +Long timestamp
-        +String packageName
-        +String eventType
-        +String? className
-        +List~String~ text
-        +String? contentDescription
-        +A11yNodeSnapshot? sourceNode
-    }
-
-    class A11yNodeSnapshot {
-        +String? text
-        +String? contentDescription
-        +String? className
-        +String? viewIdResourceName
-        +String? packageName
-        +Boolean clickable
-        +Boolean enabled
-        +Boolean focused
-        +Boolean selected
-        +Boolean checked
-        +Boolean editable
-        +List~String~ actions
-        +RectSnapshot boundsInScreen
-        +List~A11yNodeSnapshot~ children
-    }
-
-    class RectSnapshot {
-        +Int left
-        +Int top
-        +Int right
-        +Int bottom
-    }
-
-    class BlindCheckFlow {
-        +String targetPackage
-        +Long startedAt
-        +Long? endedAt
-        +String schemaVersion
-        +List~A11yEventRecord~ events
-    }
-
-    A11yEventRecord --> A11yNodeSnapshot : sourceNode
-    A11yNodeSnapshot --> RectSnapshot : boundsInScreen
-    A11yNodeSnapshot --> A11yNodeSnapshot : children
-    BlindCheckFlow --> A11yEventRecord : events
+```kotlin
+private val setup  = AndroidAccessibilitySetup.create()
+private val driver = AndroidAccessibilityTestDriver.create()
 ```
 
-Todos os modelos são data classes Kotlin imutáveis e sem dependência do Android framework — serializáveis para JSON.
-
----
-
-## Pipeline de captura de eventos
-
-```mermaid
-sequenceDiagram
-    participant System as Android System
-    participant Service as TrackingAccessibilityService
-    participant EvNorm as A11yEventNormalizer
-    participant NodeNorm as A11yNodeNormalizer
-    participant Store as TrackingEventStore
-
-    System->>Service: onAccessibilityEvent(event)
-    Service->>EvNorm: normalize(event)
-    EvNorm->>NodeNorm: normalizeNode(sourceNode, depth=0, budget)
-    loop até maxDepth=8 ou maxNodes=250
-        NodeNorm->>NodeNorm: normalizeNode(child, depth+1, budget)
-    end
-    NodeNorm-->>EvNorm: A11yNodeSnapshot
-    EvNorm-->>Service: A11yEventRecord
-    Service->>Store: record(event)
-    Note over Store: filtra por pacote e tipo\nse recording=true
-```
-
----
-
-## Fluxo de controle remoto (Desktop → Gesto)
-
-```mermaid
-sequenceDiagram
-    participant User as Usuário
-    participant Desktop as blindcheck-desktop
-    participant ADB as ADB
-    participant Receiver as RemoteActionReceiver
-    participant Service as TrackingAccessibilityService
-    participant Android as Android Framework
-
-    User->>Desktop: clica "Next"
-    Desktop->>ADB: am broadcast -a ACTION_NEXT
-    ADB->>Receiver: onReceive(intent)
-    Receiver->>Service: executor.execute("ACTION_NEXT")
-    Service->>Android: dispatchGesture(swipeRight 150ms)
-    Android-->>Service: AccessibilityEvent (foco mudou)
-    Service->>Service: onAccessibilityEvent → record()
-```
-
-O `RemoteActionReceiver` valida se a ação está no conjunto `SUPPORTED_ACTIONS` antes de delegar. O `executor` é a própria instância do service — `TrackingAccessibilityService` implementa `ActionExecutor`.
-
----
-
-## Gestos implementados
-
-```mermaid
-flowchart LR
-    subgraph Ações["execute(action)"]
-        NEXT["ACTION_NEXT\n→ swipe direita 25%→75% w\n150ms"]
-        PREV["ACTION_PREVIOUS\n→ swipe esquerda 75%→25% w\n150ms"]
-        ACT["ACTION_ACTIVATE\n→ dois toques no centro\n0ms + 100ms offset"]
-        BACK["ACTION_BACK\n→ GLOBAL_ACTION_BACK"]
-        SF["ACTION_SCROLL_FORWARD\n→ 2 dedos p/ cima 70%→30% h\n400ms"]
-        SB["ACTION_SCROLL_BACKWARD\n→ 2 dedos p/ baixo 30%→70% h\n400ms"]
-        HOME["ACTION_HOME\n→ GLOBAL_ACTION_HOME"]
-        REC["ACTION_RECENTS\n→ GLOBAL_ACTION_RECENTS"]
-        SU["ACTION_SWIPE_UP\n→ 1 dedo p/ cima 80%→20% h\n600ms"]
-        SD["ACTION_SWIPE_DOWN\n→ 1 dedo p/ baixo 20%→80% h\n600ms"]
-    end
-```
-
-Os gestos de navegação (next/previous) reproduzem exatamente o comportamento do TalkBack. O double-tap do `activate` usa dois `StrokeDescription` de 1ms com 100ms de intervalo, que o TalkBack interpreta como ativação do elemento focado.
-
----
-
-## Fluxo de teste instrumentado
-
-```mermaid
-sequenceDiagram
-    participant Test as Teste (instrumented)
-    participant Driver as AndroidAccessibilityTestDriver
-    participant Actions as AndroidUserAccessibilityActions
-    participant UiDevice as UiDevice (UIAutomator)
-    participant Store as TrackingEventStore
-    participant Assertions as FocusSequenceExpectation
-
-    Test->>Driver: actions().next()
-    Driver->>Actions: next()
-    Actions->>UiDevice: swipe(25%w, cy, 75%w, cy, steps=10)
-
-    Test->>Driver: assertCurrentWindowContains(expectation)
-    Driver->>Store: snapshot()
-    Store-->>Driver: List~A11yEventRecord~
-    Driver->>Assertions: assertMatches(events, package)
-    Note over Assertions: compara texto, contentDescription\ne estados nó a nó
-    Assertions-->>Test: ✓ ou AssertionError detalhado
-```
-
-O driver usa polling com retry (timeout 2s, intervalo 50ms) para aguardar o evento aparecer no store antes de falhar.
-
----
-
-## TrackingEventStore — máquina de estado
-
-```mermaid
-stateDiagram-v2
-    [*] --> Parado : init
-
-    Parado --> Gravando : startRecording()
-    Gravando --> Parado : stopRecording()
-
-    state Gravando {
-        [*] --> Filtrando
-        Filtrando --> Armazenando : pacote ∈ targetPackages\n(ou sem filtro)
-        Armazenando --> Filtrando : próximo evento
-    }
-
-    Gravando --> Gravando : addTargetPackage()\nremoveTargetPackage()\naddTargetEventType()
-```
-
-O store é um singleton (`TrackingEventStore.shared`). A lista interna é um `mutableListOf` protegido por `@Volatile` no flag `isRecording`. Os filtros de pacote e tipo são `LinkedHashSet` para preservar ordem de inserção.
-
----
-
-## Diagrama de componentes (C4 nível 2)
-
-```mermaid
-C4Component
-    title BlindCheck — Componentes
-
-    Person(tester, "QA / Dev", "Escreve testes\nautomatizados")
-    Person(operator, "Operador", "Usa o Desktop\npara controle manual")
-
-    System_Boundary(desktop, "blindcheck-desktop") {
-        Component(ui_desktop, "RemoteControlApp", "Compose Desktop", "Botões que disparam broadcasts via ADB")
-    }
-
-    System_Boundary(device, "Dispositivo Android") {
-        System_Boundary(tracking, "blindcheck-tracking-app") {
-            Component(ui_stream, "TrackingEventStreamScreen", "Compose", "Stream de eventos em tempo real")
-        }
-        System_Boundary(interactor_mod, "blindcheck-interactor") {
-            Component(service, "TrackingAccessibilityService", "AccessibilityService", "Captura eventos e injeta gestos")
-            Component(receiver, "RemoteActionReceiver", "BroadcastReceiver", "Recebe broadcasts de ação remota")
-        }
-        System_Boundary(tracker_mod, "blindcheck-tracker") {
-            Component(store, "TrackingEventStore", "Singleton", "Buffer de eventos gravados")
-            Component(normalizer, "A11yEventNormalizer", "Kotlin class", "Converte AccessibilityEvent → A11yEventRecord")
-        }
-        System_Boundary(testing_mod, "blindcheck-testing") {
-            Component(driver, "AndroidAccessibilityTestDriver", "Test API", "Asserções sobre o estado atual")
-            Component(actions, "AndroidUserAccessibilityActions", "UserAccessibilityActions", "Gestos via UiDevice")
-            Component(models, "Models", "Data classes", "A11yEventRecord, A11yNodeSnapshot, RectSnapshot")
-        }
-        System_Boundary(testapp, "blindcheck-test-app") {
-            Component(sample, "BlindCheckMockupApp", "Compose", "App de exemplo (Login + Frutas)")
-        }
-    }
-
-    Rel(operator, ui_desktop, "Clica botões")
-    Rel(tester, driver, "Usa em testes instrumentados")
-    Rel(ui_desktop, receiver, "ADB broadcast", "am broadcast -a ACTION_*")
-    Rel(receiver, service, "executor.execute()")
-    Rel(service, normalizer, "normalize(event)")
-    Rel(normalizer, store, "record(A11yEventRecord)")
-    Rel(ui_stream, store, "snapshot() polling 500ms")
-    Rel(driver, store, "snapshot() com retry")
-    Rel(driver, actions, "delega navegação")
-    Rel(actions, sample, "UiDevice gestures")
-    Rel(service, sample, "dispatchGesture()")
-```
-
----
-
-## Makefile — comandos de operação
-
-| Target | Descrição |
+| Objeto | Responsabilidade |
 |---|---|
-| `make enable-tracking` | Ativa o serviço de acessibilidade BlindCheck no dispositivo |
-| `make enable-talkback` | Ativa o TalkBack junto ao BlindCheck |
-| `make disable-talkback` | Desativa o TalkBack mantendo o BlindCheck |
-| `make next` | Envia `ACTION_NEXT` via ADB |
-| `make previous` | Envia `ACTION_PREVIOUS` via ADB |
-| `make activate` | Envia `ACTION_ACTIVATE` via ADB |
-| `make back` | Envia `ACTION_BACK` via ADB |
-| `make scroll-forward` / `make scroll-backward` | Scroll com dois dedos |
-| `make home` / `make recents` | Ações globais do sistema |
-| `make swipe-up` / `make swipe-down` | Gestos verticais de dedo único |
-| `make logcat` | Filtra logs das tags BlindCheck |
+| `AndroidAccessibilitySetup` | Habilita acessibilidade no dispositivo antes do teste |
+| `AndroidAccessibilityTestDriver` | Faz asserções sobre o que está acessível na janela atual |
 
 ---
 
-## Decisões de design relevantes
+## Setup mínimo
 
-### 1. Gestos reais em vez de ações virtuais
-`AccessibilityNodeInfo.performAction(ACTION_CLICK)` não funciona para UI do sistema (app drawer, launcher). Todos os comandos de navegação usam `AccessibilityService.dispatchGesture()` com `GestureDescription`, reproduzindo o comportamento físico que o TalkBack intercepta.
+```kotlin
+@get:Rule
+val composeRule = createAndroidComposeRule<MainActivity>()
 
-### 2. Separação de camadas
-- **Modelos** não dependem do Android framework — são data classes puras, serializáveis.
-- **blindcheck-testing** exporta a API pública de asserções sem expor `AccessibilityNodeInfo` ou `AccessibilityEvent`.
-- **blindcheck-tracker** expõe `blindcheck-testing` via `api()`, tornando os modelos transitivos para os consumidores.
+private val setup  = AndroidAccessibilitySetup.create()
+private val driver = AndroidAccessibilityTestDriver.create()
 
-### 3. Manifesto por merge
-O `blindcheck-interactor` declara o `<service>` e o `<receiver>` no próprio `AndroidManifest.xml`. Ao ser incluído como dependência, o Android Gradle Plugin faz o merge automático no manifesto do app — o `blindcheck-tracking-app` não precisa repetir as declarações.
+@Before
+fun enableAccessibility() {
+    setup.ensureAccessibilityEnabled()
+    composeRule.waitForIdle()
+}
+```
 
-### 4. `internal` como barreira de módulo
-`TrackingAccessibilityService.executor` é `internal`, acessível apenas dentro de `blindcheck-interactor`. O `setExecutorForTest()` é `public` para permitir injeção em testes instrumentados de outros módulos, sem expor o campo diretamente.
+`ensureAccessibilityEnabled()` escreve nas configurações seguras do Android para que o sistema de acessibilidade processe os eventos — obrigatório mesmo sem o TalkBack ligado.
+
+---
+
+## Os dois estilos de teste
+
+### Estilo 1 — Verificação estática (o que está acessível na tela)
+
+Use quando quer garantir que um elemento **existe e é acessível**, independente de navegar até ele.
+
+```kotlin
+// Verifica que o campo existe na árvore de acessibilidade
+driver.assertCurrentWindowContains(
+    FocusExpectation(textContains = "E-mail", editable = true)
+)
+
+// Verifica que a mensagem de erro aparece após uma ação
+driver.assertCurrentWindowContains(
+    FocusExpectation(textContains = "Informe o e-mail")
+)
+
+// Verifica que uma imagem tem contentDescription
+driver.assertCurrentWindowContains(
+    FocusExpectation(contentDescriptionContains = "Imagem de Banana")
+)
+```
+
+### Estilo 2 — Jornada (navegação como o TalkBack faria)
+
+Use quando quer simular o fluxo real de um usuário cego: swipes para navegar, duplo-toque para ativar.
+
+```kotlin
+@Test
+fun loginJourney_swipeNavigation_logsInSuccessfully() = runTest {
+    val actions = driver.actions()
+
+    actions.next()   // swipe direita → foco no heading
+    driver.assertFocused(FocusExpectation(textContains = "Acessar conta"))
+
+    actions.next()   // swipe direita → foco no campo e-mail
+    driver.assertFocused(FocusExpectation(textContains = "E-mail", editable = true))
+    actions.activate()                     // duplo-toque para ativar o campo
+    actions.inputText("dev@example.com")
+
+    actions.next()   // swipe direita → foco no campo senha
+    actions.activate()
+    actions.inputText("123456")
+
+    actions.next()   // swipe direita → foco no botão
+    driver.assertFocused(FocusExpectation(textContains = "Entrar", clickable = true))
+    actions.activate()                     // duplo-toque para submeter
+
+    composeRule.waitForIdle()
+    driver.assertCurrentWindowContains(FocusExpectation(textContains = "Frutas"))
+}
+```
+
+---
+
+## API de ações (`UserAccessibilityActions`)
+
+Obtido via `driver.actions()`. Todos os métodos são `suspend`.
+
+| Método | Equivalente TalkBack | Comportamento físico |
+|---|---|---|
+| `next()` | Swipe para direita | Desloca o foco de acessibilidade para o próximo elemento |
+| `previous()` | Swipe para esquerda | Desloca o foco para o elemento anterior |
+| `activate()` | Duplo-toque | Ativa o elemento com foco atual |
+| `scrollForward()` | Swipe para cima com dois dedos | Rola o conteúdo para frente |
+| `scrollBackward()` | Swipe para baixo com dois dedos | Rola o conteúdo para trás |
+| `inputText(value)` | Teclado | Define texto no campo editável com foco |
+| `back()` | Botão Voltar | Navega para a tela anterior |
+
+```kotlin
+val actions = driver.actions()
+
+actions.next()
+actions.activate()
+actions.inputText("texto")
+actions.back()
+```
+
+---
+
+## API de asserções (`AndroidAccessibilityTestDriver`)
+
+### `assertCurrentWindowContains(expectation)`
+
+Verifica que **algum nó** na janela ativa satisfaz a expectativa. Tem retry automático com timeout de 2s.
+
+```kotlin
+driver.assertCurrentWindowContains(FocusExpectation(textContains = "Frutas"))
+```
+
+### `assertFocused(expectation)`
+
+Verifica que o nó **com foco de acessibilidade atual** satisfaz a expectativa.
+
+```kotlin
+driver.assertFocused(FocusExpectation(textContains = "Entrar", clickable = true))
+```
+
+### `assertCurrentWindowFeedback(expectation)`
+
+Verifica que existe texto anunciável contendo a string. Útil para mensagens de erro e feedback de estado.
+
+```kotlin
+driver.assertCurrentWindowFeedback(FeedbackExpectation(contains = "Informe o e-mail"))
+```
+
+### `focusFirst(expectation): Boolean`
+
+Move o foco de acessibilidade para o primeiro nó que satisfaz a expectativa. Retorna `true` se encontrou, `false` se não.
+
+```kotlin
+val reached = driver.focusFirst(FocusExpectation(textContains = "Banana"))
+assertTrue("Item Banana deve ser alcançável via acessibilidade", reached)
+```
+
+### `currentWindowEvents()`
+
+Retorna todos os nós da janela como uma lista de eventos sintéticos. Útil para `FocusSequenceExpectation`.
+
+```kotlin
+val events = driver.currentWindowEvents()
+```
+
+---
+
+## `FocusExpectation` — referência completa
+
+Matcher que descreve o que você espera de um nó de acessibilidade. Todos os parâmetros são opcionais e funcionam como filtros cumulativos (AND).
+
+```kotlin
+FocusExpectation(
+    textEquals              = "Entrar",           // texto exato
+    textContains            = "Entr",             // texto parcial
+    contentDescriptionEquals    = "Botão entrar", // contentDescription exata
+    contentDescriptionContains  = "Imagem de",    // contentDescription parcial
+    clickable = true,   // elemento deve ser clicável
+    editable  = true,   // elemento deve ser editável (campo de texto)
+    enabled   = true,   // elemento deve estar habilitado
+    selected  = false,  // estado de seleção esperado
+    checked   = false,  // estado de marcação esperado (checkbox, switch)
+)
+```
+
+**Exemplos práticos:**
+
+```kotlin
+// Campo de texto de e-mail
+FocusExpectation(textContains = "E-mail", editable = true)
+
+// Botão de submit
+FocusExpectation(textContains = "Entrar", clickable = true)
+
+// Imagem com descrição (sem texto visível)
+FocusExpectation(contentDescriptionContains = "Imagem de Banana")
+
+// Botão desabilitado
+FocusExpectation(textContains = "Confirmar", clickable = true, enabled = false)
+```
+
+---
+
+## `FocusSequenceExpectation` — ordem de leitura
+
+Verifica se um conjunto de elementos aparece **na ordem correta** na árvore de acessibilidade. O TalkBack lê os elementos nessa ordem ao fazer swipes, então essa asserção valida o reading order do seu app.
+
+```kotlin
+FocusSequenceExpectation(
+    items = listOf(
+        FocusExpectation(textContains = "Acessar conta"),    // heading
+        FocusExpectation(textContains = "E-mail", editable = true),
+        FocusExpectation(textContains = "Senha",  editable = true),
+        FocusExpectation(textContains = "Entrar", clickable = true),
+    ),
+).assertMatches(
+    events = driver.currentWindowEvents(),
+    targetPackage = "com.seu.app",
+)
+```
+
+A verificação é **sub-sequência**: elementos intermediários entre os esperados não causam falha. A asserção garante a ordem relativa, não a ausência de outros elementos.
+
+**Quando usar:** quando a ordem de leitura for um requisito de acessibilidade explícito (ex.: formulários, onboardings, listas de conteúdo editorial).
+
+---
+
+## Padrões recorrentes
+
+### Testar que erros de validação são acessíveis
+
+```kotlin
+@Test
+fun emptySubmit_errorsAreAnnouncedByScreenReader() = runTest {
+    val actions = driver.actions()
+
+    // Navega até o botão e submete sem preencher
+    actions.next() // heading
+    actions.next() // e-mail
+    actions.next() // senha
+    actions.next() // botão Entrar
+    actions.activate()
+    composeRule.waitForIdle()
+
+    // Erros devem aparecer na árvore de acessibilidade
+    driver.assertCurrentWindowContains(FocusExpectation(textContains = "Informe o e-mail"))
+    driver.assertCurrentWindowContains(FocusExpectation(textContains = "Informe a senha"))
+}
+```
+
+### Testar que imagens têm descrição
+
+```kotlin
+@Test
+fun productImage_hasContentDescription() {
+    // Navega até a tela de detalhe...
+
+    driver.assertCurrentWindowContains(
+        FocusExpectation(contentDescriptionContains = "Imagem de Banana")
+    )
+}
+```
+
+### Testar que um elemento é alcançável
+
+```kotlin
+@Test
+fun backButton_isFocusableAndClickable() {
+    val reached = driver.focusFirst(
+        FocusExpectation(textContains = "Voltar", clickable = true)
+    )
+    assertTrue("Botão Voltar deve ser alcançável via acessibilidade", reached)
+}
+```
+
+### Testar navegação entre telas
+
+```kotlin
+@Test
+fun fruitItem_activating_opensFruitDetail() = runTest {
+    val actions = driver.actions()
+    loginViaSwipeNavigation()
+
+    actions.next() // heading "Frutas"
+    actions.next() // primeiro item
+    driver.assertFocused(FocusExpectation(textContains = "Banana"))
+
+    actions.activate()
+    composeRule.waitForIdle()
+
+    driver.assertCurrentWindowContains(
+        FocusExpectation(contentDescriptionContains = "Imagem de Banana")
+    )
+}
+```
+
+---
+
+## O que a lib NÃO substitui
+
+| Aspecto | O que testar com |
+|---|---|
+| Layout visual, cores, contraste | Testes manuais ou ferramentas de lint |
+| Renderização correta de componentes | Compose UI tests (`assertIsDisplayed`, etc.) |
+| Lógica de negócio e estados | Unit tests |
+| Acessibilidade real com TalkBack | Teste manual no dispositivo |
+
+BlindCheck valida a **camada de acessibilidade do Android** — o que o sistema expõe para leitores de tela. É complementar, não substituto, dos outros tipos de teste.
+
+---
+
+## Estrutura de módulos
+
+```mermaid
+graph LR
+    YourApp["seu-app\n(androidTest)"]
+    Testing["blindcheck-testing\nModelos · Asserções · Driver"]
+    Tracker["blindcheck-tracker\n(usado pelo serviço de rastreamento)"]
+
+    YourApp -->|androidTestImplementation| Testing
+    Tracker --> Testing
+```
+
+O único módulo que você precisa como dependência de teste é `:blindcheck-testing`. Os demais (`:blindcheck-tracker`, `:blindcheck-interactor`, `:blindcheck-tracking-app`) são infraestrutura interna do sistema de rastreamento de eventos.
