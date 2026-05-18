@@ -91,12 +91,9 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
         }
     }
 
-    private fun isAccessibilityFocusable(node: AccessibilityNodeInfo): Boolean {
-        return !node.text.isNullOrBlank() ||
-            !node.contentDescription.isNullOrBlank() ||
-            node.isClickable ||
-            node.isEditable
-    }
+    private fun isAccessibilityFocusable(node: AccessibilityNodeInfo): Boolean =
+        node.isVisibleToUser &&
+            node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS }
 
     private fun findFirstScrollable(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
         if (node.isScrollable) return AccessibilityNodeInfo.obtain(node)
