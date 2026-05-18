@@ -4,6 +4,15 @@ TRACKING_SERVICE=$(TRACKING_PKG)/.TrackingAccessibilityService
 TALKBACK_SERVICE=com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService
 TEST_APP_PKG=com.theustech.blindcheck_testeapp
 
+ACTION_NEXT     = com.theustech.blindcheck.ACTION_NEXT
+ACTION_PREVIOUS = com.theustech.blindcheck.ACTION_PREVIOUS
+ACTION_ACTIVATE = com.theustech.blindcheck.ACTION_ACTIVATE
+ACTION_BACK     = com.theustech.blindcheck.ACTION_BACK
+ACTION_SCROLL_FORWARD  = com.theustech.blindcheck.ACTION_SCROLL_FORWARD
+ACTION_SCROLL_BACKWARD = com.theustech.blindcheck.ACTION_SCROLL_BACKWARD
+
+BROADCAST = $(ADB) shell am broadcast -p $(TRACKING_PKG) -a
+
 .PHONY: devices
 devices:
 	$(ADB) devices
@@ -50,6 +59,33 @@ check-a11y:
 open-a11y-settings:
 	$(ADB) shell am start -a android.settings.ACCESSIBILITY_SETTINGS
 
+## ── Remote navigation (terminal validation) ─────────────────────────────────
+.PHONY: next previous activate back scroll-forward scroll-backward
+
+next:
+	$(BROADCAST) $(ACTION_NEXT)
+
+previous:
+	$(BROADCAST) $(ACTION_PREVIOUS)
+
+activate:
+	$(BROADCAST) $(ACTION_ACTIVATE)
+
+back:
+	$(BROADCAST) $(ACTION_BACK)
+
+scroll-forward:
+	$(BROADCAST) $(ACTION_SCROLL_FORWARD)
+
+scroll-backward:
+	$(BROADCAST) $(ACTION_SCROLL_BACKWARD)
+
+## Watch accessibility event logs (BlindCheckRemote + BlindCheckTracker tags)
+.PHONY: logs
+logs:
+	$(ADB) logcat -s BlindCheckRemote:D BlindCheckTracker:D
+
+## ── Tests ────────────────────────────────────────────────────────────────────
 .PHONY: test
 test:
 	./gradlew connectedDebugAndroidTest

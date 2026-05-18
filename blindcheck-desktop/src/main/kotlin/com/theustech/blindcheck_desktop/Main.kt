@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
+private const val TRACKING_PKG = "com.theustech.blindcheck_tracking_app"
 private const val ACTION_NEXT = "com.theustech.blindcheck.ACTION_NEXT"
 private const val ACTION_PREVIOUS = "com.theustech.blindcheck.ACTION_PREVIOUS"
 private const val ACTION_ACTIVATE = "com.theustech.blindcheck.ACTION_ACTIVATE"
@@ -22,7 +23,9 @@ private const val ACTION_SCROLL_BACKWARD = "com.theustech.blindcheck.ACTION_SCRO
 
 fun sendAdbBroadcast(action: String): Boolean {
     return try {
-        val process = ProcessBuilder("adb", "shell", "am", "broadcast", "-a", action)
+        val process = ProcessBuilder(
+            "adb", "shell", "am", "broadcast", "-p", TRACKING_PKG, "-a", action
+        )
             .redirectErrorStream(true)
             .start()
         process.waitFor(5, TimeUnit.SECONDS)
