@@ -26,6 +26,7 @@ class RemoteActionReceiver : BroadcastReceiver() {
             RemoteActions.ACTION_HOME,
             RemoteActions.ACTION_RECENTS,
             RemoteActions.ACTION_SWIPE_UP,
+            RemoteActions.ACTION_SWIPE_DOWN,
         )
     }
 }

@@ -42,7 +42,8 @@ private const val ACTION_SCROLL_FORWARD  = "com.theustech.blindcheck.ACTION_SCRO
 private const val ACTION_SCROLL_BACKWARD = "com.theustech.blindcheck.ACTION_SCROLL_BACKWARD"
 private const val ACTION_HOME     = "com.theustech.blindcheck.ACTION_HOME"
 private const val ACTION_RECENTS  = "com.theustech.blindcheck.ACTION_RECENTS"
-private const val ACTION_SWIPE_UP = "com.theustech.blindcheck.ACTION_SWIPE_UP"
+private const val ACTION_SWIPE_UP   = "com.theustech.blindcheck.ACTION_SWIPE_UP"
+private const val ACTION_SWIPE_DOWN = "com.theustech.blindcheck.ACTION_SWIPE_DOWN"
 
 // ── ADB helpers ───────────────────────────────────────────────────────────────
 
@@ -174,6 +175,9 @@ fun RemoteControlApp() {
                     }
                     OutlinedButton(onClick = { send(ACTION_SWIPE_UP, "Swipe Up") }, enabled = connected) {
                         Text("↑  Swipe Up")
+                    }
+                    OutlinedButton(onClick = { send(ACTION_SWIPE_DOWN, "Swipe Down") }, enabled = connected) {
+                        Text("↓  Swipe Down")
                     }
                 }
 

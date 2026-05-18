@@ -35,6 +35,7 @@
                 <action android:name="com.theustech.blindcheck.ACTION_HOME" />
                 <action android:name="com.theustech.blindcheck.ACTION_RECENTS" />
                 <action android:name="com.theustech.blindcheck.ACTION_SWIPE_UP" />
+                <action android:name="com.theustech.blindcheck.ACTION_SWIPE_DOWN" />
             </intent-filter>
         </receiver>
 
