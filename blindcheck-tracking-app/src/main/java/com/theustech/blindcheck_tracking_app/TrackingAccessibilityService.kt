@@ -129,9 +129,30 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
     private fun activateFocused() {
         val root = rootInActiveWindow ?: return
         root.useNode { node ->
-            (node.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
-                ?: node.findFocus(AccessibilityNodeInfo.FOCUS_INPUT))
-                ?.useNode { it.performAction(AccessibilityNodeInfo.ACTION_CLICK) }
+            val focused = node.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+                ?: node.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                ?: return@useNode
+            focused.useNode { target ->
+                // Replicate TalkBack double-tap: inject a real gesture tap at the
+                // center of the element's screen bounds. ACTION_CLICK is a virtual
+                // action that system UI elements (e.g. app drawer) may not handle.
+                val bounds = android.graphics.Rect()
+                target.getBoundsInScreen(bounds)
+                if (!bounds.isEmpty) {
+                    val path = Path().apply {
+                        moveTo(bounds.exactCenterX(), bounds.exactCenterY())
+                    }
+                    val gesture = GestureDescription.Builder()
+                        .addStroke(GestureDescription.StrokeDescription(path, 0L, 1L))
+                        .build()
+                    val dispatched = dispatchGesture(gesture, null, null)
+                    Log.d(TAG, "activate: gesture tap dispatched=$dispatched bounds=$bounds")
+                } else {
+                    // Bounds not available (e.g. virtual node) — fall back to ACTION_CLICK
+                    val clicked = target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    Log.d(TAG, "activate: ACTION_CLICK clicked=$clicked (no bounds)")
+                }
+            }
         }
     }
 
