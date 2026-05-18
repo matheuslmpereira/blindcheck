@@ -441,14 +441,8 @@ private fun EventRecordRow(event: A11yEventRecord, modifier: Modifier = Modifier
             )
         }
         event.sourceNode?.let { node ->
-            val states = buildList {
-                if (node.focused) add("focused")
-                if (node.clickable) add("clickable")
-                if (node.editable) add("editable")
-                if (!node.enabled) add("disabled")
-            }.joinToString(", ").ifBlank { "enabled" }
             Text(
-                text = "State: $states",
+                text = "State: ${node.stateString()}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -557,17 +551,19 @@ private fun buildEventDump(
                 appendLine("  Description: ${event.contentDescription}")
             }
             event.sourceNode?.let { node ->
-                val states = buildList {
-                    if (node.focused) add("focused")
-                    if (node.clickable) add("clickable")
-                    if (node.editable) add("editable")
-                    if (!node.enabled) add("disabled")
-                }.joinToString(", ").ifBlank { "enabled" }
-                appendLine("  State: $states")
+                appendLine("  State: ${node.stateString()}")
             }
             appendLine()
         }
     }.trimEnd()
 }
+
+private fun com.theustech.blindcheck_testing.model.A11yNodeSnapshot.stateString(): String =
+    buildList {
+        if (focused) add("focused")
+        if (clickable) add("clickable")
+        if (editable) add("editable")
+        if (!enabled) add("disabled")
+    }.joinToString(", ").ifBlank { "enabled" }
 
 private const val EVENT_REFRESH_MS = 500L

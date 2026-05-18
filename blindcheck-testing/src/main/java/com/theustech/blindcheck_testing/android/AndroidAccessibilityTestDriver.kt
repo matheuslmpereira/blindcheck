@@ -140,13 +140,6 @@ class AndroidAccessibilityTestDriver(
         }
     }
 
-    private inline fun <T> AccessibilityNodeInfo.useNode(block: (AccessibilityNodeInfo) -> T): T {
-        return try {
-            block(this)
-        } finally {
-            recycle()
-        }
-    }
 
     companion object {
         const val SYNTHETIC_SNAPSHOT_EVENT_TYPE = "TYPE_SYNTHETIC_WINDOW_SNAPSHOT"

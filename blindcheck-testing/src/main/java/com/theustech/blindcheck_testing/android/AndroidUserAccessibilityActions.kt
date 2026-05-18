@@ -71,9 +71,6 @@ class AndroidUserAccessibilityActions(
         uiDevice.swipe(cx, fromY, cx, toY, SWIPE_STEPS_SCROLL)
     }
 
-    private inline fun <T> AccessibilityNodeInfo.useNode(block: (AccessibilityNodeInfo) -> T): T =
-        try { block(this) } finally { recycle() }
-
     companion object {
         private const val SWIPE_STEPS_FAST   = 10  // ~150 ms — navigation swipe
         private const val SWIPE_STEPS_SCROLL = 20  // ~300 ms — scroll swipe

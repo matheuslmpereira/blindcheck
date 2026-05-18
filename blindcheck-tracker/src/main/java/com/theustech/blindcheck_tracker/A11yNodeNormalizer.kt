@@ -88,6 +88,6 @@ class A11yNodeNormalizer(
 
     companion object {
         const val DEFAULT_MAX_DEPTH = 8
-        const val DEFAULT_MAX_NODES = 200
+        const val DEFAULT_MAX_NODES = 250
     }
 }

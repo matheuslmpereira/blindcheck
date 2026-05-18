@@ -3,6 +3,7 @@ package com.theustech.blindcheck_testing
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import com.theustech.blindcheck_testing.android.AndroidAccessibilityNodeMapper
+import com.theustech.blindcheck_testing.android.useNode
 import com.theustech.blindcheck_testing.model.RectSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -93,11 +94,4 @@ class AndroidAccessibilityNodeMapperTest {
         child.recycle()
     }
 
-    private inline fun <T> AccessibilityNodeInfo.useNode(block: (AccessibilityNodeInfo) -> T): T {
-        return try {
-            block(this)
-        } finally {
-            recycle()
-        }
-    }
 }
