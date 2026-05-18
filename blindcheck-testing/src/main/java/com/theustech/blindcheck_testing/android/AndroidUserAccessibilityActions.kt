@@ -3,6 +3,7 @@ package com.theustech.blindcheck_testing.android
 import android.app.Instrumentation
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.test.uiautomator.UiDevice
 import com.theustech.blindcheck_testing.actions.UserAccessibilityActions
 
@@ -10,6 +11,8 @@ class AndroidUserAccessibilityActions(
     private val instrumentation: Instrumentation,
     private val uiDevice: UiDevice = UiDevice.getInstance(instrumentation),
 ) : UserAccessibilityActions {
+
+    private var lastFocusedIdx: Int = -1
     override suspend fun next() {
         moveFocus(forward = true)
     }
@@ -78,9 +81,11 @@ class AndroidUserAccessibilityActions(
         val root = instrumentation.uiAutomation.rootInActiveWindow ?: return
         val candidates = mutableListOf<AccessibilityNodeInfo>()
 
+        // When a node is focusable, stop descending — children belong to that node's semantics.
         fun traverse(node: AccessibilityNodeInfo) {
             if (isAccessibilityFocusable(node)) {
                 candidates.add(AccessibilityNodeInfo.obtain(node))
+                return
             }
             for (i in 0 until node.childCount) {
                 val child = runCatching { node.getChild(i) }.getOrNull() ?: continue
@@ -88,26 +93,30 @@ class AndroidUserAccessibilityActions(
             }
         }
 
+        val currentIdx = lastFocusedIdx
+
         try {
             root.useNode { traverse(it) }
             if (candidates.isEmpty()) return
 
-            val focusedIdx = candidates.indexOfFirst { it.isAccessibilityFocused }
+            val focusedIdx = if (currentIdx < 0 || currentIdx >= candidates.size) -1 else currentIdx
             val targetIdx = when {
                 forward && focusedIdx < 0 -> 0
                 forward -> (focusedIdx + 1).coerceAtMost(candidates.size - 1)
                 focusedIdx <= 0 -> candidates.size - 1
                 else -> focusedIdx - 1
             }
-            candidates[targetIdx].performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
+            val ok = candidates[targetIdx].performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
+            if (ok) lastFocusedIdx = targetIdx
         } finally {
             candidates.forEach { runCatching { it.recycle() } }
         }
     }
 
-    private fun isAccessibilityFocusable(node: AccessibilityNodeInfo): Boolean =
-        node.isVisibleToUser &&
-            node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS }
+    private fun isAccessibilityFocusable(node: AccessibilityNodeInfo): Boolean {
+        if (!node.isVisibleToUser) return false
+        return AccessibilityNodeInfoCompat.wrap(node).isScreenReaderFocusable
+    }
 
     private fun AccessibilityNodeInfo.findFirstScrollable(): AccessibilityNodeInfo? {
         if (isScrollable) return AccessibilityNodeInfo.obtain(this)
