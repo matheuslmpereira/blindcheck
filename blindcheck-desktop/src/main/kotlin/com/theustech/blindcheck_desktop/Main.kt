@@ -2,62 +2,102 @@ package com.theustech.blindcheck_desktop
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.TimeUnit
 
-private const val TRACKING_PKG = "com.theustech.blindcheck_tracking_app"
-private const val ACTION_NEXT = "com.theustech.blindcheck.ACTION_NEXT"
+// ── ADB resolution ────────────────────────────────────────────────────────────
+
+private fun resolveAdb(): String {
+    val sdkRoot = System.getenv("ANDROID_HOME")
+        ?: System.getenv("ANDROID_SDK_ROOT")
+        ?: "${System.getProperty("user.home")}/Library/Android/sdk"
+    val fromSdk = File("$sdkRoot/platform-tools/adb")
+    if (fromSdk.canExecute()) return fromSdk.absolutePath
+    return "adb" // fall back to PATH
+}
+
+private val ADB = resolveAdb()
+
+// ── Broadcast constants ───────────────────────────────────────────────────────
+
+private const val TRACKING_PKG   = "com.theustech.blindcheck_tracking_app"
+private const val ACTION_NEXT    = "com.theustech.blindcheck.ACTION_NEXT"
 private const val ACTION_PREVIOUS = "com.theustech.blindcheck.ACTION_PREVIOUS"
 private const val ACTION_ACTIVATE = "com.theustech.blindcheck.ACTION_ACTIVATE"
-private const val ACTION_BACK = "com.theustech.blindcheck.ACTION_BACK"
-private const val ACTION_SCROLL_FORWARD = "com.theustech.blindcheck.ACTION_SCROLL_FORWARD"
+private const val ACTION_BACK    = "com.theustech.blindcheck.ACTION_BACK"
+private const val ACTION_SCROLL_FORWARD  = "com.theustech.blindcheck.ACTION_SCROLL_FORWARD"
 private const val ACTION_SCROLL_BACKWARD = "com.theustech.blindcheck.ACTION_SCROLL_BACKWARD"
 
-fun sendAdbBroadcast(action: String): Boolean {
+// ── ADB helpers ───────────────────────────────────────────────────────────────
+
+data class AdbResult(val success: Boolean, val output: String)
+
+private fun runAdb(vararg args: String): AdbResult {
     return try {
-        val process = ProcessBuilder(
-            "adb", "shell", "am", "broadcast", "-p", TRACKING_PKG, "-a", action
-        )
+        val process = ProcessBuilder(ADB, *args)
             .redirectErrorStream(true)
             .start()
-        process.waitFor(5, TimeUnit.SECONDS)
-        process.exitValue() == 0
+        val timedOut = !process.waitFor(5, TimeUnit.SECONDS)
+        val output = process.inputStream.bufferedReader().readText().trim()
+        if (timedOut) process.destroyForcibly()
+        AdbResult(success = !timedOut && process.exitValue() == 0, output = output)
     } catch (e: Exception) {
-        false
+        AdbResult(success = false, output = "Error: ${e.message}")
     }
 }
 
-fun checkAdbConnected(): Boolean {
-    return try {
-        val process = ProcessBuilder("adb", "devices")
-            .redirectErrorStream(true)
-            .start()
-        process.waitFor(3, TimeUnit.SECONDS)
-        val output = process.inputStream.bufferedReader().readText()
-        output.lines().drop(1).any { it.contains("\tdevice") }
-    } catch (e: Exception) {
-        false
-    }
+private fun sendBroadcast(action: String): AdbResult =
+    runAdb("shell", "am", "broadcast", "-p", TRACKING_PKG, "-a", action)
+
+private fun connectedDevice(): String? {
+    val result = runAdb("devices")
+    val line = result.output.lines().drop(1).firstOrNull { it.contains("\tdevice") }
+    return line?.substringBefore("\t")?.trim()
 }
+
+// ── UI ────────────────────────────────────────────────────────────────────────
 
 @Composable
 @Preview
 fun RemoteControlApp() {
     val scope = rememberCoroutineScope()
-    var deviceConnected by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf("") }
+    var device by remember { mutableStateOf<String?>(null) }
+    var checking by remember { mutableStateOf(true) }
+    var log by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        deviceConnected = checkAdbConnected()
+    fun appendLog(line: String) { log = "• $line\n$log" }
+
+    fun refreshDevice() {
+        scope.launch {
+            checking = true
+            device = withContext(Dispatchers.IO) { connectedDevice() }
+            checking = false
+            appendLog(if (device != null) "Device: $device" else "No device found — is ADB running? ($ADB)")
+        }
     }
+
+    fun send(action: String, label: String) {
+        scope.launch {
+            appendLog("Sending $label…")
+            val result = withContext(Dispatchers.IO) { sendBroadcast(action) }
+            appendLog(if (result.success) "OK [$label]  ${result.output}" else "FAIL [$label]  ${result.output}")
+        }
+    }
+
+    LaunchedEffect(Unit) { refreshDevice() }
 
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -66,79 +106,77 @@ fun RemoteControlApp() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "BlindCheck Remote",
-                    style = MaterialTheme.typography.headlineMedium
-                )
+                Text("BlindCheck Remote", style = MaterialTheme.typography.headlineMedium)
 
+                // Device status row
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val color = if (deviceConnected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.error
-                    Text(
-                        text = if (deviceConnected) "Device connected" else "No device found",
-                        color = color,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    TextButton(onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            deviceConnected = checkAdbConnected()
-                        }
-                    }) {
-                        Text("Refresh")
+                    if (checking) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        val color = if (device != null) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.error
+                        Text(
+                            text = device ?: "No device",
+                            color = color,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
                     }
+                    TextButton(onClick = { refreshDevice() }) { Text("Refresh") }
                 }
 
                 HorizontalDivider()
 
-                fun sendAction(action: String, label: String) {
-                    scope.launch(Dispatchers.IO) {
-                        val ok = sendAdbBroadcast(action)
-                        statusMessage = if (ok) "Sent: $label" else "Failed: $label"
+                val connected = device != null
+
+                // Navigation row
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { send(ACTION_PREVIOUS, "Previous") }, enabled = connected) {
+                        Text("◀  Previous")
+                    }
+                    Button(onClick = { send(ACTION_NEXT, "Next") }, enabled = connected) {
+                        Text("Next  ▶")
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = { sendAction(ACTION_PREVIOUS, "Previous") },
-                        enabled = deviceConnected
-                    ) { Text("◀  Previous") }
-
-                    Button(
-                        onClick = { sendAction(ACTION_NEXT, "Next") },
-                        enabled = deviceConnected
-                    ) { Text("Next  ▶") }
-                }
-
+                // Activate
                 Button(
-                    onClick = { sendAction(ACTION_ACTIVATE, "Activate") },
-                    enabled = deviceConnected,
+                    onClick = { send(ACTION_ACTIVATE, "Activate") },
+                    enabled = connected,
                     modifier = Modifier.fillMaxWidth(0.6f)
                 ) { Text("✓  Activate") }
 
+                // Scroll row
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { sendAction(ACTION_SCROLL_BACKWARD, "Scroll Backward") },
-                        enabled = deviceConnected
-                    ) { Text("↑  Scroll Back") }
-
-                    OutlinedButton(
-                        onClick = { sendAction(ACTION_SCROLL_FORWARD, "Scroll Forward") },
-                        enabled = deviceConnected
-                    ) { Text("↓  Scroll Forward") }
+                    OutlinedButton(onClick = { send(ACTION_SCROLL_BACKWARD, "Scroll Backward") }, enabled = connected) {
+                        Text("↑  Scroll Back")
+                    }
+                    OutlinedButton(onClick = { send(ACTION_SCROLL_FORWARD, "Scroll Forward") }, enabled = connected) {
+                        Text("↓  Scroll Forward")
+                    }
                 }
 
-                OutlinedButton(
-                    onClick = { sendAction(ACTION_BACK, "Back") },
-                    enabled = deviceConnected
-                ) { Text("⬅  Back") }
+                // Back
+                OutlinedButton(onClick = { send(ACTION_BACK, "Back") }, enabled = connected) {
+                    Text("⬅  Back")
+                }
 
-                if (statusMessage.isNotEmpty()) {
+                HorizontalDivider()
+
+                // Log output
+                Text("Log", style = MaterialTheme.typography.labelSmall)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     Text(
-                        text = statusMessage,
+                        text = log.ifEmpty { "—" },
                         style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
