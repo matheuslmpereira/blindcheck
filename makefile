@@ -10,6 +10,8 @@ ACTION_ACTIVATE = com.theustech.blindcheck.ACTION_ACTIVATE
 ACTION_BACK     = com.theustech.blindcheck.ACTION_BACK
 ACTION_SCROLL_FORWARD  = com.theustech.blindcheck.ACTION_SCROLL_FORWARD
 ACTION_SCROLL_BACKWARD = com.theustech.blindcheck.ACTION_SCROLL_BACKWARD
+ACTION_HOME    = com.theustech.blindcheck.ACTION_HOME
+ACTION_RECENTS = com.theustech.blindcheck.ACTION_RECENTS
 
 BROADCAST = $(ADB) shell am broadcast -p $(TRACKING_PKG) -a
 
@@ -60,7 +62,7 @@ open-a11y-settings:
 	$(ADB) shell am start -a android.settings.ACCESSIBILITY_SETTINGS
 
 ## ── Remote navigation (terminal validation) ─────────────────────────────────
-.PHONY: next previous activate back scroll-forward scroll-backward
+.PHONY: next previous activate back scroll-forward scroll-backward home recents
 
 next:
 	$(BROADCAST) $(ACTION_NEXT)
@@ -79,6 +81,12 @@ scroll-forward:
 
 scroll-backward:
 	$(BROADCAST) $(ACTION_SCROLL_BACKWARD)
+
+home:
+	$(BROADCAST) $(ACTION_HOME)
+
+recents:
+	$(BROADCAST) $(ACTION_RECENTS)
 
 ## Watch accessibility event logs (BlindCheckRemote + BlindCheckTracker tags)
 .PHONY: logs

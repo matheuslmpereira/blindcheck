@@ -51,6 +51,8 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
             RemoteActions.ACTION_BACK -> performGlobalAction(GLOBAL_ACTION_BACK)
             RemoteActions.ACTION_SCROLL_FORWARD -> scrollFocused(forward = true)
             RemoteActions.ACTION_SCROLL_BACKWARD -> scrollFocused(forward = false)
+            RemoteActions.ACTION_HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
+            RemoteActions.ACTION_RECENTS -> performGlobalAction(GLOBAL_ACTION_RECENTS)
         }
     }
 

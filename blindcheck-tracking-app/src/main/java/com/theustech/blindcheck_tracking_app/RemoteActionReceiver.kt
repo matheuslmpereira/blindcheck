@@ -23,6 +23,8 @@ class RemoteActionReceiver : BroadcastReceiver() {
             RemoteActions.ACTION_BACK,
             RemoteActions.ACTION_SCROLL_FORWARD,
             RemoteActions.ACTION_SCROLL_BACKWARD,
+            RemoteActions.ACTION_HOME,
+            RemoteActions.ACTION_RECENTS,
         )
     }
 }

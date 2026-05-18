@@ -7,4 +7,6 @@ object RemoteActions {
     const val ACTION_BACK = "com.theustech.blindcheck.ACTION_BACK"
     const val ACTION_SCROLL_FORWARD = "com.theustech.blindcheck.ACTION_SCROLL_FORWARD"
     const val ACTION_SCROLL_BACKWARD = "com.theustech.blindcheck.ACTION_SCROLL_BACKWARD"
+    const val ACTION_HOME = "com.theustech.blindcheck.ACTION_HOME"
+    const val ACTION_RECENTS = "com.theustech.blindcheck.ACTION_RECENTS"
 }

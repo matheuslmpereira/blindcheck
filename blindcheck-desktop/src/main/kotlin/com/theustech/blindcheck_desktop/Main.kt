@@ -40,6 +40,8 @@ private const val ACTION_ACTIVATE = "com.theustech.blindcheck.ACTION_ACTIVATE"
 private const val ACTION_BACK    = "com.theustech.blindcheck.ACTION_BACK"
 private const val ACTION_SCROLL_FORWARD  = "com.theustech.blindcheck.ACTION_SCROLL_FORWARD"
 private const val ACTION_SCROLL_BACKWARD = "com.theustech.blindcheck.ACTION_SCROLL_BACKWARD"
+private const val ACTION_HOME    = "com.theustech.blindcheck.ACTION_HOME"
+private const val ACTION_RECENTS = "com.theustech.blindcheck.ACTION_RECENTS"
 
 // ── ADB helpers ───────────────────────────────────────────────────────────────
 
@@ -158,9 +160,17 @@ fun RemoteControlApp() {
                     }
                 }
 
-                // Back
-                OutlinedButton(onClick = { send(ACTION_BACK, "Back") }, enabled = connected) {
-                    Text("⬅  Back")
+                // System navigation row
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { send(ACTION_BACK, "Back") }, enabled = connected) {
+                        Text("⬅  Back")
+                    }
+                    OutlinedButton(onClick = { send(ACTION_HOME, "Home") }, enabled = connected) {
+                        Text("⌂  Home")
+                    }
+                    OutlinedButton(onClick = { send(ACTION_RECENTS, "Recents") }, enabled = connected) {
+                        Text("▣  Recents")
+                    }
                 }
 
                 HorizontalDivider()

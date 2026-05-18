@@ -32,6 +32,8 @@
                 <action android:name="com.theustech.blindcheck.ACTION_BACK" />
                 <action android:name="com.theustech.blindcheck.ACTION_SCROLL_FORWARD" />
                 <action android:name="com.theustech.blindcheck.ACTION_SCROLL_BACKWARD" />
+                <action android:name="com.theustech.blindcheck.ACTION_HOME" />
+                <action android:name="com.theustech.blindcheck.ACTION_RECENTS" />
             </intent-filter>
         </receiver>
 
