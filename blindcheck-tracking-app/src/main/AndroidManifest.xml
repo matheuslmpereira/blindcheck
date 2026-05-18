@@ -8,36 +8,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Blindchecktesteapp">
-        <service
-            android:name=".TrackingAccessibilityService"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/tracking_accessibility_service" />
-        </service>
-
-        <receiver
-            android:name=".RemoteActionReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.theustech.blindcheck.ACTION_NEXT" />
-                <action android:name="com.theustech.blindcheck.ACTION_PREVIOUS" />
-                <action android:name="com.theustech.blindcheck.ACTION_ACTIVATE" />
-                <action android:name="com.theustech.blindcheck.ACTION_BACK" />
-                <action android:name="com.theustech.blindcheck.ACTION_SCROLL_FORWARD" />
-                <action android:name="com.theustech.blindcheck.ACTION_SCROLL_BACKWARD" />
-                <action android:name="com.theustech.blindcheck.ACTION_HOME" />
-                <action android:name="com.theustech.blindcheck.ACTION_RECENTS" />
-                <action android:name="com.theustech.blindcheck.ACTION_SWIPE_UP" />
-                <action android:name="com.theustech.blindcheck.ACTION_SWIPE_DOWN" />
-            </intent-filter>
-        </receiver>
 
         <activity
             android:name=".MainActivity"

@@ -1,6 +1,6 @@
 ADB=adb
 TRACKING_PKG=com.theustech.blindcheck_tracking_app
-TRACKING_SERVICE=$(TRACKING_PKG)/.TrackingAccessibilityService
+TRACKING_SERVICE=$(TRACKING_PKG)/com.theustech.blindcheck_interactor.TrackingAccessibilityService
 TALKBACK_SERVICE=com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService
 TEST_APP_PKG=com.theustech.blindcheck_testeapp
 

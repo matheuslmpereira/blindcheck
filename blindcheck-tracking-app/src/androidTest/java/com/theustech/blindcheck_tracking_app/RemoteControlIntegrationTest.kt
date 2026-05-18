@@ -3,6 +3,7 @@ package com.theustech.blindcheck_tracking_app
 import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.theustech.blindcheck_interactor.TrackingAccessibilityService
 import com.theustech.blindcheck_tracker.RemoteActions
 import org.junit.After
 import org.junit.Assert.assertEquals
