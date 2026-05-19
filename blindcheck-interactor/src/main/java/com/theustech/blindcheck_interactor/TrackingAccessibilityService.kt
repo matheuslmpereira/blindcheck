@@ -56,14 +56,15 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
         return try {
             val text = node.text?.toString()?.trim()
             val cd = node.contentDescription?.toString()?.trim()
+            val role = roleFromClassName(node.className?.toString())
             val content = when {
                 !text.isNullOrBlank() && !cd.isNullOrBlank() -> "$text, $cd"
                 !text.isNullOrBlank() -> text
                 !cd.isNullOrBlank() -> cd
                 event.text.isNotEmpty() -> event.text.joinToString(", ")
+                role != null -> ""  // no text but known role — still worth logging
                 else -> return null
             }
-            val role = roleFromClassName(node.className?.toString())
             val states = buildList {
                 if (!node.isEnabled) add("desabilitado")
                 if (node.isEditable) add("editável")
@@ -72,7 +73,7 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
 
             buildString {
                 append(content)
-                role?.let { append(", $it") }
+                if (content.isNotBlank()) role?.let { append(", $it") } else role?.let { append(it) }
                 if (states.isNotBlank()) append(", $states")
             }
         } finally {

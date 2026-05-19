@@ -465,28 +465,53 @@ private fun LogEntryRow(entry: LogEntry) {
 }
 
 @Composable
-private fun LogPanel(entries: List<LogEntry>, modifier: Modifier = Modifier) {
+private fun LogPanel(
+    entries: List<LogEntry>,
+    rawLines: List<String>,
+    modifier: Modifier = Modifier,
+) {
     val cs = MaterialTheme.colorScheme
+    var showRaw by remember { mutableStateOf(false) }
+
     Column(modifier.padding(start = 0.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.padding(bottom = 6.dp),
         ) {
-            Text("Anúncios", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+            Text(
+                if (showRaw) "Logcat" else "Anúncios",
+                style = MaterialTheme.typography.labelSmall,
+                color = cs.outline,
+            )
             Spacer(Modifier.weight(1f))
-            // Legend
-            Icon(Icons.Rounded.Accessibility, null, Modifier.size(10.dp), tint = cs.onSurfaceVariant.copy(alpha = 0.5f))
-            Text("foco", style = MaterialTheme.typography.labelSmall, color = cs.outline)
-            Spacer(Modifier.width(6.dp))
-            Icon(Icons.Rounded.VolumeUp, null, Modifier.size(10.dp), tint = cs.primary)
-            Text("anúncio", style = MaterialTheme.typography.labelSmall, color = cs.outline)
-            Spacer(Modifier.width(6.dp))
-            Icon(Icons.Rounded.Smartphone, null, Modifier.size(10.dp), tint = cs.primary)
-            Text("tela", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+            if (!showRaw) {
+                Icon(Icons.Rounded.Accessibility, null, Modifier.size(10.dp), tint = cs.onSurfaceVariant.copy(alpha = 0.5f))
+                Text("foco", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Rounded.VolumeUp, null, Modifier.size(10.dp), tint = cs.primary)
+                Text("anúncio", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Rounded.Smartphone, null, Modifier.size(10.dp), tint = cs.primary)
+                Text("tela", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+                Spacer(Modifier.width(6.dp))
+            }
+            TextButton(
+                onClick = { showRaw = !showRaw },
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                modifier = Modifier.height(20.dp),
+            ) {
+                Text(
+                    if (showRaw) "Parsed" else "Logcat",
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
         }
+
         val scrollState = rememberScrollState()
-        LaunchedEffect(entries.size) { if (entries.isNotEmpty()) scrollState.scrollTo(0) }
+        val itemCount = if (showRaw) rawLines.size else entries.size
+        LaunchedEffect(itemCount) { if (itemCount > 0) scrollState.scrollTo(0) }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -494,11 +519,29 @@ private fun LogPanel(entries: List<LogEntry>, modifier: Modifier = Modifier) {
                 .padding(8.dp)
                 .verticalScroll(scrollState),
         ) {
-            if (entries.isEmpty()) {
-                Text("—", style = MaterialTheme.typography.bodySmall, color = cs.outline, fontFamily = FontFamily.Monospace)
+            if (showRaw) {
+                if (rawLines.isEmpty()) {
+                    Text("—", style = MaterialTheme.typography.bodySmall, color = cs.outline, fontFamily = FontFamily.Monospace)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        rawLines.forEach { line ->
+                            Text(
+                                text = line,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = cs.onSurfaceVariant,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                            )
+                        }
+                    }
+                }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    entries.forEach { LogEntryRow(it) }
+                if (entries.isEmpty()) {
+                    Text("—", style = MaterialTheme.typography.bodySmall, color = cs.outline, fontFamily = FontFamily.Monospace)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        entries.forEach { LogEntryRow(it) }
+                    }
                 }
             }
         }
@@ -521,6 +564,7 @@ fun RemoteControlApp() {
     var device by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
     val logEntries = remember { mutableStateListOf<LogEntry>() }
+    val rawLines  = remember { mutableStateListOf<String>() }
 
     fun appendLog(entry: LogEntry) {
         logEntries.add(0, entry)
@@ -573,6 +617,28 @@ fun RemoteControlApp() {
         }
     }
 
+    // Raw logcat stream for the announce tag — shown in debug/Logcat view.
+    LaunchedEffect(device) {
+        if (device == null) return@LaunchedEffect
+        var lastSeen = withContext(Dispatchers.IO) {
+            runAdb("logcat", "-d", "-s", "$ANNOUNCE_TAG:I").output
+                .lines().lastOrNull { ANNOUNCE_TAG in it } ?: ""
+        }
+        while (true) {
+            delay(500)
+            val result = withContext(Dispatchers.IO) {
+                runAdb("logcat", "-d", "-s", "$ANNOUNCE_TAG:I")
+            }
+            val newLines = result.output.lines()
+                .filter { ANNOUNCE_TAG in it && it > lastSeen }
+            newLines.forEach { line ->
+                rawLines.add(0, line)
+                if (rawLines.size > 500) rawLines.removeAt(rawLines.lastIndex)
+            }
+            if (newLines.isNotEmpty()) lastSeen = newLines.last()
+        }
+    }
+
     LaunchedEffect(Unit) { refreshDevice() }
 
     MaterialTheme(colorScheme = InterColorScheme) {
@@ -587,6 +653,7 @@ fun RemoteControlApp() {
                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 LogPanel(
                     entries = logEntries,
+                    rawLines = rawLines,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }
