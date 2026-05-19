@@ -55,16 +55,36 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
         val node = event.source ?: return null
         return try {
             val text = node.text?.toString()?.trim()
-            val cd = node.contentDescription?.toString()?.trim()
-            val role = roleFromClassName(node.className?.toString())
+            val cd   = node.contentDescription?.toString()?.trim()
+
+            // Compose may place label text and role in child nodes rather than the focused node itself.
+            var childText: String? = null
+            var childRole: String? = null
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                try {
+                    if (childText == null) {
+                        val ct  = child.text?.toString()?.trim()
+                        val ccd = child.contentDescription?.toString()?.trim()
+                        childText = ct?.takeIf { it.isNotBlank() } ?: ccd?.takeIf { it.isNotBlank() }
+                    }
+                    if (childRole == null) childRole = roleFromClassName(child.className?.toString())
+                } finally {
+                    child.recycle()
+                }
+            }
+
+            val role = roleFromClassName(node.className?.toString()) ?: childRole
             val content = when {
                 !text.isNullOrBlank() && !cd.isNullOrBlank() -> "$text, $cd"
-                !text.isNullOrBlank() -> text
-                !cd.isNullOrBlank() -> cd
+                !text.isNullOrBlank()  -> text
+                !cd.isNullOrBlank()    -> cd
+                !childText.isNullOrBlank() -> childText!!
                 event.text.isNotEmpty() -> event.text.joinToString(", ")
-                role != null -> ""  // no text but known role — still worth logging
+                role != null -> ""
                 else -> return null
             }
+
             val states = buildList {
                 if (!node.isEnabled) add("desabilitado")
                 if (node.isEditable) add("editável")
