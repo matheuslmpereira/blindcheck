@@ -27,7 +27,27 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        eventStore.record(normalizer.normalize(event))
+        val record = normalizer.normalize(event)
+        eventStore.record(record)
+        logAnnouncement(event)
+    }
+
+    private fun logAnnouncement(event: AccessibilityEvent) {
+        val message = when (event.eventType) {
+            AccessibilityEvent.TYPE_ANNOUNCEMENT ->
+                event.text.joinToString(" ").takeIf { it.isNotBlank() }
+
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                val title = event.text.joinToString(" ").ifBlank {
+                    event.contentDescription?.toString()
+                } ?: return
+                "Janela: $title"
+            }
+
+            else -> return
+        } ?: return
+
+        Log.i(ANNOUNCE_TAG, message)
     }
 
     override fun onInterrupt() = Unit
@@ -102,6 +122,7 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
 
     companion object {
         private const val TAG = "BlindCheckTracker"
+        const val ANNOUNCE_TAG = "BlindCheckAnnounce"
 
         @Volatile
         var instance: TrackingAccessibilityService? = null

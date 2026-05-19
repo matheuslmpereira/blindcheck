@@ -30,6 +30,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -74,6 +75,7 @@ private val ADB = resolveAdb()
 // ── Broadcast constants ───────────────────────────────────────────────────────
 
 private const val TRACKING_PKG       = "com.theustech.blindcheck_tracking_app"
+private const val ANNOUNCE_TAG       = "BlindCheckAnnounce"
 private const val ACTION_NEXT        = "com.theustech.blindcheck.ACTION_NEXT"
 private const val ACTION_PREVIOUS    = "com.theustech.blindcheck.ACTION_PREVIOUS"
 private const val ACTION_ACTIVATE    = "com.theustech.blindcheck.ACTION_ACTIVATE"
@@ -106,6 +108,14 @@ private fun connectedDevice(): String? {
     val result = runAdb("devices")
     return result.output.lines().drop(1).firstOrNull { it.contains("\tdevice") }
         ?.substringBefore("\t")?.trim()
+}
+
+// Parses a logcat line and returns the message after the tag, or null.
+// Logcat format: "MM-DD HH:MM:SS.mmm  PID  TID I BlindCheckAnnounce: <message>"
+private fun parseAnnouncement(line: String): String? {
+    val marker = "$ANNOUNCE_TAG: "
+    val idx = line.indexOf(marker)
+    return if (idx >= 0) line.substring(idx + marker.length).trim() else null
 }
 
 // ── Button components ─────────────────────────────────────────────────────────
@@ -371,15 +381,87 @@ private fun RemotePanel(
 // ── Log panel ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun LogPanel(entries: List<String>, modifier: Modifier = Modifier) {
+private fun LogEntryRow(entry: LogEntry) {
+    val cs = MaterialTheme.colorScheme
+    when (entry) {
+        is LogEntry.Announce -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        if (entry.isWindow) cs.primaryContainer.copy(alpha = 0.5f)
+                        else cs.primaryContainer.copy(alpha = 0.25f),
+                        RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = if (entry.isWindow) Icons.Rounded.Smartphone else Icons.Rounded.VolumeUp,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = cs.primary,
+                )
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = cs.onPrimaryContainer,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                )
+            }
+        }
+        is LogEntry.Action -> {
+            Row(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (entry.success) "✓" else "✗",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (entry.success) cs.primary else cs.error,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = cs.onSurfaceVariant,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+        }
+        is LogEntry.System -> {
+            Text(
+                text = entry.text,
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.outline,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun LogPanel(entries: List<LogEntry>, modifier: Modifier = Modifier) {
     val cs = MaterialTheme.colorScheme
     Column(modifier.padding(start = 0.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
-        Text(
-            "Log",
-            style = MaterialTheme.typography.labelSmall,
-            color = cs.outline,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.padding(bottom = 6.dp),
-        )
+        ) {
+            Text("Anúncios", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+            Spacer(Modifier.weight(1f))
+            // Legend
+            Icon(Icons.Rounded.Smartphone, null, Modifier.size(10.dp), tint = cs.primary)
+            Text("tela", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+            Spacer(Modifier.width(6.dp))
+            Icon(Icons.Rounded.VolumeUp, null, Modifier.size(10.dp), tint = cs.primary)
+            Text("anúncio", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+        }
         val scrollState = rememberScrollState()
         LaunchedEffect(entries.size) { if (entries.isNotEmpty()) scrollState.scrollTo(0) }
         Box(
@@ -392,19 +474,8 @@ private fun LogPanel(entries: List<String>, modifier: Modifier = Modifier) {
             if (entries.isEmpty()) {
                 Text("—", style = MaterialTheme.typography.bodySmall, color = cs.outline, fontFamily = FontFamily.Monospace)
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    entries.forEach { entry ->
-                        Text(
-                            text = entry,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = when {
-                                entry.startsWith("✗") -> cs.error
-                                entry.startsWith("✓") -> cs.primary
-                                else -> cs.onSurfaceVariant
-                            },
-                        )
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    entries.forEach { LogEntryRow(it) }
                 }
             }
         }
@@ -413,16 +484,22 @@ private fun LogPanel(entries: List<String>, modifier: Modifier = Modifier) {
 
 // ── App root ──────────────────────────────────────────────────────────────────
 
+sealed interface LogEntry {
+    data class Action(val text: String, val success: Boolean) : LogEntry
+    data class Announce(val text: String, val isWindow: Boolean) : LogEntry
+    data class System(val text: String) : LogEntry
+}
+
 @Composable
 @Preview
 fun RemoteControlApp() {
     val scope = rememberCoroutineScope()
     var device by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
-    val logEntries = remember { mutableStateListOf<String>() }
+    val logEntries = remember { mutableStateListOf<LogEntry>() }
 
-    fun appendLog(line: String) {
-        logEntries.add(0, line)
+    fun appendLog(entry: LogEntry) {
+        logEntries.add(0, entry)
         if (logEntries.size > 200) logEntries.removeAt(logEntries.lastIndex)
     }
 
@@ -431,14 +508,40 @@ fun RemoteControlApp() {
             checking = true
             device = withContext(Dispatchers.IO) { connectedDevice() }
             checking = false
-            appendLog(if (device != null) "● Device: $device" else "✗ No device — is ADB running?")
+            appendLog(LogEntry.System(
+                if (device != null) "● Device: $device" else "✗ No device — is ADB running?"
+            ))
         }
     }
 
     fun send(action: String, label: String) {
         scope.launch {
             val result = withContext(Dispatchers.IO) { sendBroadcast(action) }
-            appendLog(if (result.success) "✓ $label" else "✗ $label — ${result.output}")
+            appendLog(LogEntry.Action(label, result.success))
+        }
+    }
+
+    // Poll logcat for accessibility announcements emitted by the tracking service.
+    LaunchedEffect(device) {
+        if (device == null) return@LaunchedEffect
+        // Bootstrap: mark current logcat position so we only show new announcements.
+        var lastSeen = withContext(Dispatchers.IO) {
+            runAdb("logcat", "-d", "-s", "$ANNOUNCE_TAG:I").output
+                .lines().lastOrNull { ANNOUNCE_TAG in it } ?: ""
+        }
+        while (true) {
+            delay(500)
+            val result = withContext(Dispatchers.IO) {
+                runAdb("logcat", "-d", "-s", "$ANNOUNCE_TAG:I")
+            }
+            val newLines = result.output.lines()
+                .filter { ANNOUNCE_TAG in it && it > lastSeen }
+            newLines.forEach { line ->
+                val msg = parseAnnouncement(line) ?: return@forEach
+                val isWindow = msg.startsWith("Janela: ")
+                appendLog(LogEntry.Announce(msg, isWindow))
+            }
+            if (newLines.isNotEmpty()) lastSeen = newLines.last()
         }
     }
 
