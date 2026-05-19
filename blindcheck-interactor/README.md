@@ -21,6 +21,25 @@ blindcheck-interactor
 
 O serviço é declarado no manifesto da lib e registrado automaticamente ao instalar o `blindcheck-tracking-app`.
 
+### Log de anúncios (`BlindCheckAnnounce`)
+
+Além de gravar no store, o serviço emite logs de acessibilidade legíveis via logcat, consumidos pelo `blindcheck-desktop` em tempo real.
+
+| Prefixo | Evento de origem | Exemplo |
+|---|---|---|
+| `FOCUS` | `TYPE_VIEW_ACCESSIBILITY_FOCUSED` | `FOCUS E-mail, Campo de texto, editável` |
+| `ANN` | `TYPE_ANNOUNCEMENT` / `TYPE_WINDOW_CONTENT_CHANGED` | `ANN Informe o e-mail` |
+| `WIN` | `TYPE_WINDOW_STATE_CHANGED` | `WIN Acessar conta` |
+
+**Deduplicação:** textos já anunciados em um evento FOCUS imediatamente anterior são suprimidos de eventos ANN subsequentes para evitar ruído (ex.: label "E-mail" não reaparece como ANN quando o erro do mesmo campo dispara).
+
+**Detecção de erro:** `TYPE_WINDOW_CONTENT_CHANGED` é processado quando:
+- `node.error != null` → campo com erro ativo; extrai texto dos filhos
+- `node.liveRegion != 0` → região de atualização automática
+- `node.parent.error != null` → container de texto de suporte de um campo com erro
+
+**Estrutura de traversal:** para elementos Compose (label, role, erro), o serviço percorre filhos e netos do nó focado, já que a árvore de acessibilidade do Compose distribui textos em nós filhos.
+
 ### Gestos implementados
 
 | Ação | Gesto físico | Parâmetros |

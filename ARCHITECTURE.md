@@ -339,3 +339,69 @@ graph LR
 ```
 
 O único módulo que você precisa como dependência de teste é `:blindcheck-testing`. Os demais (`:blindcheck-tracker`, `:blindcheck-interactor`, `:blindcheck-tracking-app`) são infraestrutura interna do sistema de rastreamento de eventos.
+
+---
+
+## Sistema de controle remoto e streaming de anúncios
+
+O `blindcheck-desktop` complementa os testes instrumentados com uma ferramenta para sessões de exploração manual — especialmente útil antes de escrever testes, para descobrir o fluxo de navegação real do TalkBack.
+
+### Fluxo de controle (desktop → dispositivo)
+
+```
+blindcheck-desktop
+  │  (adb broadcast -a ACTION_NEXT)
+  ▼
+RemoteActionReceiver       ← BroadcastReceiver no dispositivo
+  │  delegate executor
+  ▼
+TrackingAccessibilityService.execute()
+  │  dispatchGesture()
+  ▼
+Sistema Android (TalkBack intercepta o gesto físico)
+```
+
+Cada botão ou tecla do desktop emite um broadcast ADB para o pacote `com.theustech.blindcheck_tracking_app`. O `RemoteActionReceiver` delega ao `TrackingAccessibilityService`, que injeta o gesto físico correspondente via `dispatchGesture()` — exatamente como se o usuário tivesse feito o gesto na tela.
+
+### Fluxo de anúncios (dispositivo → desktop)
+
+```
+AccessibilityEvent (Android Framework)
+  │
+  ▼
+TrackingAccessibilityService.logAnnouncement()
+  │  Log.i("BlindCheckAnnounce", "FOCUS|ANN|WIN <texto>")
+  ▼
+logcat (ring buffer do dispositivo)
+  │
+  ▼ polling 500ms via "adb logcat -d -s BlindCheckAnnounce:I"
+  │
+blindcheck-desktop (LaunchedEffect)
+  │  parseAnnouncement() → prefixo FOCUS/ANN/WIN
+  ▼
+LogPanel (UI em tempo real)
+```
+
+O serviço emite três prefixos de log:
+
+| Prefixo | Evento de origem | Descrição |
+|---|---|---|
+| `FOCUS` | `TYPE_VIEW_ACCESSIBILITY_FOCUSED` | Elemento que recebeu foco; inclui texto, role e estados |
+| `ANN` | `TYPE_ANNOUNCEMENT` / `TYPE_WINDOW_CONTENT_CHANGED` | Anúncio dinâmico, live region ou texto de erro |
+| `WIN` | `TYPE_WINDOW_STATE_CHANGED` | Mudança de tela ou janela |
+
+### Deduplicação de ruído
+
+Quando um campo com erro recebe foco, o TalkBack anuncia o label ("E-mail") e em seguida o erro ("Informe o e-mail") via dois eventos distintos. Para evitar que o label apareça duas vezes no log, o serviço mantém `lastFocusTexts` — o conjunto de textos do FOCUS mais recente — e filtra ANN entries que já estão nesse conjunto.
+
+### Atalhos de teclado (desktop)
+
+| Tecla | Ação |
+|---|---|
+| `→` | ACTION_NEXT (próximo elemento TalkBack) |
+| `←` | ACTION_PREVIOUS |
+| `Enter` / `Espaço` | ACTION_ACTIVATE (duplo-toque) |
+| `Esc` / `Backspace` | ACTION_BACK |
+| `↑` | ACTION_SCROLL_FORWARD |
+| `↓` | ACTION_SCROLL_BACKWARD |
+| `Delete` | Limpa o log |
