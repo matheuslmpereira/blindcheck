@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import com.theustech.blindcheck_tracker.A11yEventNormalizer
 import com.theustech.blindcheck_tracker.RemoteActions
 import com.theustech.blindcheck_tracker.TrackingEventStore
@@ -48,6 +49,43 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
                 } ?: return
                 Log.i(ANNOUNCE_TAG, "WIN $title")
             }
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
+                val node = event.source ?: return
+                try {
+                    val hasError     = node.error != null
+                    val isLiveRegion = node.liveRegion != 0
+                    // Also handle the supporting-text container: a View whose parent EditText has an error.
+                    val parentHasError = if (!hasError && !isLiveRegion) {
+                        val parent = node.parent
+                        try { parent?.error != null } finally { parent?.recycle() }
+                    } else false
+
+                    if (!hasError && !isLiveRegion && !parentHasError) return
+
+                    // When parentHasError: this node IS the supporting-text container → text is in its children.
+                    // When hasError: error text is in grandchildren (supporting-text slot is a child View).
+                    val msgs = mutableListOf<String>()
+                    fun nodeText(n: AccessibilityNodeInfo): String? {
+                        val t = n.text?.toString()?.trim()
+                        val c = n.contentDescription?.toString()?.trim()
+                        return t?.takeIf { it.isNotBlank() } ?: c?.takeIf { it.isNotBlank() }
+                    }
+                    // Collect from direct children and grandchildren (error text location varies).
+                    for (i in 0 until node.childCount) {
+                        val child = node.getChild(i) ?: continue
+                        try {
+                            nodeText(child)?.let { msgs.add(it) }
+                            for (j in 0 until child.childCount) {
+                                val gc = child.getChild(j) ?: continue
+                                try { nodeText(gc)?.let { msgs.add(it) } } finally { gc.recycle() }
+                            }
+                        } finally { child.recycle() }
+                    }
+                    msgs.forEach { Log.i(ANNOUNCE_TAG, "ANN $it") }
+                } finally {
+                    node.recycle()
+                }
+            }
         }
     }
 
@@ -57,22 +95,32 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
             val text = node.text?.toString()?.trim()
             val cd   = node.contentDescription?.toString()?.trim()
 
-            // Compose may place label text and role in child nodes rather than the focused node itself.
-            var childText: String? = null
+            // Compose places label text and role in child nodes; error text may be a grandchild.
+            val childTexts = mutableListOf<String>()
             var childRole: String? = null
             for (i in 0 until node.childCount) {
                 val child = node.getChild(i) ?: continue
                 try {
-                    if (childText == null) {
-                        val ct  = child.text?.toString()?.trim()
-                        val ccd = child.contentDescription?.toString()?.trim()
-                        childText = ct?.takeIf { it.isNotBlank() } ?: ccd?.takeIf { it.isNotBlank() }
-                    }
+                    val ct  = child.text?.toString()?.trim()
+                    val ccd = child.contentDescription?.toString()?.trim()
+                    (ct?.takeIf { it.isNotBlank() } ?: ccd?.takeIf { it.isNotBlank() })
+                        ?.let { childTexts.add(it) }
                     if (childRole == null) childRole = roleFromClassName(child.className?.toString())
+                    // One level deeper — supporting/error text lives here in Material3 TextField
+                    for (j in 0 until child.childCount) {
+                        val gc = child.getChild(j) ?: continue
+                        try {
+                            val gct  = gc.text?.toString()?.trim()
+                            val gccd = gc.contentDescription?.toString()?.trim()
+                            (gct?.takeIf { it.isNotBlank() } ?: gccd?.takeIf { it.isNotBlank() })
+                                ?.let { if (!childTexts.contains(it)) childTexts.add(it) }
+                        } finally { gc.recycle() }
+                    }
                 } finally {
                     child.recycle()
                 }
             }
+            val childText = childTexts.joinToString(", ").takeIf { it.isNotBlank() }
 
             val role = roleFromClassName(node.className?.toString()) ?: childRole
             val content = when {
@@ -85,6 +133,7 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
                 else -> return null
             }
 
+            val error  = node.error?.toString()?.trim()
             val states = buildList {
                 if (!node.isEnabled) add("desabilitado")
                 if (node.isEditable) add("editável")
@@ -95,6 +144,7 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
                 append(content)
                 if (content.isNotBlank()) role?.let { append(", $it") } else role?.let { append(it) }
                 if (states.isNotBlank()) append(", $states")
+                if (!error.isNullOrBlank()) append(", Erro: $error")
             }
         } finally {
             node.recycle()
