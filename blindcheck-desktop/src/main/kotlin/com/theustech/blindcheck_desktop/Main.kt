@@ -17,8 +17,17 @@ import androidx.compose.material3.*
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -468,6 +477,7 @@ private fun LogEntryRow(entry: LogEntry) {
 private fun LogPanel(
     entries: List<LogEntry>,
     rawLines: List<String>,
+    onClear: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cs = MaterialTheme.colorScheme
@@ -505,6 +515,13 @@ private fun LogPanel(
                     if (showRaw) "Parsed" else "Logcat",
                     style = MaterialTheme.typography.labelSmall,
                 )
+            }
+            TextButton(
+                onClick = onClear,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                modifier = Modifier.height(20.dp),
+            ) {
+                Icon(Icons.Rounded.DeleteSweep, null, Modifier.size(12.dp))
             }
         }
 
@@ -557,6 +574,7 @@ sealed interface LogEntry {
     data class System(val text: String) : LogEntry
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 @Preview
 fun RemoteControlApp() {
@@ -565,10 +583,16 @@ fun RemoteControlApp() {
     var checking by remember { mutableStateOf(true) }
     val logEntries = remember { mutableStateListOf<LogEntry>() }
     val rawLines  = remember { mutableStateListOf<String>() }
+    val focusRequester = remember { FocusRequester() }
 
     fun appendLog(entry: LogEntry) {
         logEntries.add(0, entry)
         if (logEntries.size > 200) logEntries.removeAt(logEntries.lastIndex)
+    }
+
+    fun clearLog() {
+        logEntries.clear()
+        rawLines.clear()
     }
 
     fun refreshDevice() {
@@ -641,8 +665,30 @@ fun RemoteControlApp() {
 
     LaunchedEffect(Unit) { refreshDevice() }
 
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
     MaterialTheme(colorScheme = InterColorScheme) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .focusRequester(focusRequester)
+                .focusable()
+                .onKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown || device == null) return@onKeyEvent false
+                    when (event.key) {
+                        Key.DirectionRight -> { send(ACTION_NEXT,        "Next");            true }
+                        Key.DirectionLeft  -> { send(ACTION_PREVIOUS,    "Previous");        true }
+                        Key.Enter          -> { send(ACTION_ACTIVATE,    "Activate");        true }
+                        Key.Spacebar       -> { send(ACTION_ACTIVATE,    "Activate");        true }
+                        Key.Escape         -> { send(ACTION_BACK,        "Back");            true }
+                        Key.Backspace      -> { send(ACTION_BACK,        "Back");            true }
+                        Key.DirectionUp    -> { send(ACTION_SCROLL_FWD,  "Scroll Forward");  true }
+                        Key.DirectionDown  -> { send(ACTION_SCROLL_BACK, "Scroll Backward"); true }
+                        Key.Delete         -> { clearLog();                                  true }
+                        else               -> false
+                    }
+                },
+        ) {
             Row(modifier = Modifier.fillMaxSize()) {
                 RemotePanel(
                     device = device,
@@ -654,6 +700,7 @@ fun RemoteControlApp() {
                 LogPanel(
                     entries = logEntries,
                     rawLines = rawLines,
+                    onClear = { clearLog() },
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }

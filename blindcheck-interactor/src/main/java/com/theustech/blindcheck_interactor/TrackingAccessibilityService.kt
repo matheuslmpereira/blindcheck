@@ -15,6 +15,9 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
     private val normalizer = A11yEventNormalizer()
     private val eventStore = TrackingEventStore.shared
 
+    // Texts recently announced via FOCUS — used to suppress duplicate ANN entries.
+    @Volatile private var lastFocusTexts: Set<String> = emptySet()
+
     override fun onServiceConnected() {
         instance = this
         executor = this
@@ -37,6 +40,7 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED -> {
                 val msg = buildFocusMessage(event) ?: return
+                lastFocusTexts = msg.split(", ").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
                 Log.i(ANNOUNCE_TAG, "FOCUS $msg")
             }
             AccessibilityEvent.TYPE_ANNOUNCEMENT -> {
@@ -81,7 +85,8 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
                             }
                         } finally { child.recycle() }
                     }
-                    msgs.forEach { Log.i(ANNOUNCE_TAG, "ANN $it") }
+                    val seen = lastFocusTexts
+                    msgs.filter { it !in seen }.forEach { Log.i(ANNOUNCE_TAG, "ANN $it") }
                 } finally {
                     node.recycle()
                 }
