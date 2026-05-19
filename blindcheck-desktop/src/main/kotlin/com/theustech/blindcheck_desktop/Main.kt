@@ -412,6 +412,26 @@ private fun LogEntryRow(entry: LogEntry) {
                 )
             }
         }
+        is LogEntry.Focus -> {
+            Row(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Accessibility,
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                    tint = cs.onSurfaceVariant.copy(alpha = 0.5f),
+                )
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = cs.onSurfaceVariant,
+                )
+            }
+        }
         is LogEntry.Action -> {
             Row(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -456,11 +476,14 @@ private fun LogPanel(entries: List<LogEntry>, modifier: Modifier = Modifier) {
             Text("Anúncios", style = MaterialTheme.typography.labelSmall, color = cs.outline)
             Spacer(Modifier.weight(1f))
             // Legend
-            Icon(Icons.Rounded.Smartphone, null, Modifier.size(10.dp), tint = cs.primary)
-            Text("tela", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+            Icon(Icons.Rounded.Accessibility, null, Modifier.size(10.dp), tint = cs.onSurfaceVariant.copy(alpha = 0.5f))
+            Text("foco", style = MaterialTheme.typography.labelSmall, color = cs.outline)
             Spacer(Modifier.width(6.dp))
             Icon(Icons.Rounded.VolumeUp, null, Modifier.size(10.dp), tint = cs.primary)
             Text("anúncio", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+            Spacer(Modifier.width(6.dp))
+            Icon(Icons.Rounded.Smartphone, null, Modifier.size(10.dp), tint = cs.primary)
+            Text("tela", style = MaterialTheme.typography.labelSmall, color = cs.outline)
         }
         val scrollState = rememberScrollState()
         LaunchedEffect(entries.size) { if (entries.isNotEmpty()) scrollState.scrollTo(0) }
@@ -487,6 +510,7 @@ private fun LogPanel(entries: List<LogEntry>, modifier: Modifier = Modifier) {
 sealed interface LogEntry {
     data class Action(val text: String, val success: Boolean) : LogEntry
     data class Announce(val text: String, val isWindow: Boolean) : LogEntry
+    data class Focus(val text: String) : LogEntry
     data class System(val text: String) : LogEntry
 }
 
@@ -538,8 +562,12 @@ fun RemoteControlApp() {
                 .filter { ANNOUNCE_TAG in it && it > lastSeen }
             newLines.forEach { line ->
                 val msg = parseAnnouncement(line) ?: return@forEach
-                val isWindow = msg.startsWith("Janela: ")
-                appendLog(LogEntry.Announce(msg, isWindow))
+                when {
+                    msg.startsWith("WIN ")   -> appendLog(LogEntry.Announce(msg.removePrefix("WIN "), isWindow = true))
+                    msg.startsWith("ANN ")   -> appendLog(LogEntry.Announce(msg.removePrefix("ANN "), isWindow = false))
+                    msg.startsWith("FOCUS ") -> appendLog(LogEntry.Focus(msg.removePrefix("FOCUS ")))
+                    else                     -> appendLog(LogEntry.Announce(msg, isWindow = false))
+                }
             }
             if (newLines.isNotEmpty()) lastSeen = newLines.last()
         }

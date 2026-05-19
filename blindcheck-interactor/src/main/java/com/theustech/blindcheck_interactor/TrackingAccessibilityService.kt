@@ -33,21 +33,63 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
     }
 
     private fun logAnnouncement(event: AccessibilityEvent) {
-        val message = when (event.eventType) {
-            AccessibilityEvent.TYPE_ANNOUNCEMENT ->
-                event.text.joinToString(" ").takeIf { it.isNotBlank() }
-
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED -> {
+                val msg = buildFocusMessage(event) ?: return
+                Log.i(ANNOUNCE_TAG, "FOCUS $msg")
+            }
+            AccessibilityEvent.TYPE_ANNOUNCEMENT -> {
+                val msg = event.text.joinToString(" ").takeIf { it.isNotBlank() } ?: return
+                Log.i(ANNOUNCE_TAG, "ANN $msg")
+            }
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 val title = event.text.joinToString(" ").ifBlank {
                     event.contentDescription?.toString()
                 } ?: return
-                "Janela: $title"
+                Log.i(ANNOUNCE_TAG, "WIN $title")
             }
+        }
+    }
 
-            else -> return
-        } ?: return
+    private fun buildFocusMessage(event: AccessibilityEvent): String? {
+        val node = event.source ?: return null
+        return try {
+            val text = node.text?.toString()?.trim()
+            val cd = node.contentDescription?.toString()?.trim()
+            val content = when {
+                !text.isNullOrBlank() && !cd.isNullOrBlank() -> "$text, $cd"
+                !text.isNullOrBlank() -> text
+                !cd.isNullOrBlank() -> cd
+                event.text.isNotEmpty() -> event.text.joinToString(", ")
+                else -> return null
+            }
+            val role = roleFromClassName(node.className?.toString())
+            val states = buildList {
+                if (!node.isEnabled) add("desabilitado")
+                if (node.isEditable) add("editável")
+                if (node.isChecked) add("marcado")
+            }.joinToString(", ")
 
-        Log.i(ANNOUNCE_TAG, message)
+            buildString {
+                append(content)
+                role?.let { append(", $it") }
+                if (states.isNotBlank()) append(", $states")
+            }
+        } finally {
+            node.recycle()
+        }
+    }
+
+    private fun roleFromClassName(className: String?): String? = when {
+        className == null -> null
+        "Button" in className -> "Botão"
+        "EditText" in className -> "Campo de texto"
+        "CheckBox" in className -> "Caixa de seleção"
+        "Switch" in className -> "Interruptor"
+        "RadioButton" in className -> "Botão de rádio"
+        "ImageButton" in className -> "Botão"
+        "SeekBar" in className -> "Controle deslizante"
+        else -> null
     }
 
     override fun onInterrupt() = Unit
