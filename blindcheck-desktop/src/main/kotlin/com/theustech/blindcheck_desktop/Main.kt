@@ -6,11 +6,20 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -25,6 +34,29 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
+
+// ── Inter color scheme ────────────────────────────────────────────────────────
+
+private val InterColorScheme = lightColorScheme(
+    primary            = Color(0xFFFF6B00),
+    onPrimary          = Color.White,
+    primaryContainer   = Color(0xFFFFDCC8),
+    onPrimaryContainer = Color(0xFF3A0A00),
+    secondary          = Color(0xFF7A5436),
+    onSecondary        = Color.White,
+    secondaryContainer = Color(0xFFFFDCC0),
+    onSecondaryContainer = Color(0xFF2C1600),
+    surface            = Color(0xFFFFFBFF),
+    onSurface          = Color(0xFF201A17),
+    surfaceVariant     = Color(0xFFF5DED5),
+    onSurfaceVariant   = Color(0xFF52443D),
+    outline            = Color(0xFF85746C),
+    outlineVariant     = Color(0xFFD8C2BA),
+    error              = Color(0xFFBA1A1A),
+    onError            = Color.White,
+    background         = Color(0xFFFFFBFF),
+    onBackground       = Color(0xFF201A17),
+)
 
 // ── ADB resolution ────────────────────────────────────────────────────────────
 
@@ -41,17 +73,17 @@ private val ADB = resolveAdb()
 
 // ── Broadcast constants ───────────────────────────────────────────────────────
 
-private const val TRACKING_PKG        = "com.theustech.blindcheck_tracking_app"
-private const val ACTION_NEXT         = "com.theustech.blindcheck.ACTION_NEXT"
-private const val ACTION_PREVIOUS     = "com.theustech.blindcheck.ACTION_PREVIOUS"
-private const val ACTION_ACTIVATE     = "com.theustech.blindcheck.ACTION_ACTIVATE"
-private const val ACTION_BACK         = "com.theustech.blindcheck.ACTION_BACK"
-private const val ACTION_SCROLL_FWD   = "com.theustech.blindcheck.ACTION_SCROLL_FORWARD"
-private const val ACTION_SCROLL_BACK  = "com.theustech.blindcheck.ACTION_SCROLL_BACKWARD"
-private const val ACTION_HOME         = "com.theustech.blindcheck.ACTION_HOME"
-private const val ACTION_RECENTS      = "com.theustech.blindcheck.ACTION_RECENTS"
-private const val ACTION_SWIPE_UP     = "com.theustech.blindcheck.ACTION_SWIPE_UP"
-private const val ACTION_SWIPE_DOWN   = "com.theustech.blindcheck.ACTION_SWIPE_DOWN"
+private const val TRACKING_PKG       = "com.theustech.blindcheck_tracking_app"
+private const val ACTION_NEXT        = "com.theustech.blindcheck.ACTION_NEXT"
+private const val ACTION_PREVIOUS    = "com.theustech.blindcheck.ACTION_PREVIOUS"
+private const val ACTION_ACTIVATE    = "com.theustech.blindcheck.ACTION_ACTIVATE"
+private const val ACTION_BACK        = "com.theustech.blindcheck.ACTION_BACK"
+private const val ACTION_SCROLL_FWD  = "com.theustech.blindcheck.ACTION_SCROLL_FORWARD"
+private const val ACTION_SCROLL_BACK = "com.theustech.blindcheck.ACTION_SCROLL_BACKWARD"
+private const val ACTION_HOME        = "com.theustech.blindcheck.ACTION_HOME"
+private const val ACTION_RECENTS     = "com.theustech.blindcheck.ACTION_RECENTS"
+private const val ACTION_SWIPE_UP    = "com.theustech.blindcheck.ACTION_SWIPE_UP"
+private const val ACTION_SWIPE_DOWN  = "com.theustech.blindcheck.ACTION_SWIPE_DOWN"
 
 // ── ADB helpers ───────────────────────────────────────────────────────────────
 
@@ -80,33 +112,35 @@ private fun connectedDevice(): String? {
 
 @Composable
 private fun NavButton(
-    symbol: String,
+    icon: ImageVector,
     label: String,
     size: Dp,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    val iconSize = (size.value * 0.42f).dp
+
     Surface(
         onClick = onClick,
         modifier = Modifier.size(size),
         enabled = enabled,
-        shape = MaterialTheme.shapes.small,
-        color = if (enabled) cs.secondaryContainer else cs.surfaceVariant,
-        contentColor = if (enabled) cs.onSecondaryContainer else cs.onSurfaceVariant.copy(alpha = 0.38f),
-        border = BorderStroke(1.dp, cs.outline.copy(alpha = if (enabled) 1f else 0.3f)),
+        shape = RoundedCornerShape(12.dp),
+        color = if (enabled) cs.primaryContainer else cs.surfaceVariant,
+        contentColor = if (enabled) cs.onPrimaryContainer else cs.onSurfaceVariant.copy(alpha = 0.38f),
+        border = BorderStroke(1.dp, if (enabled) cs.primary.copy(alpha = 0.25f) else cs.outlineVariant),
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(symbol, fontSize = (size.value * 0.28f).sp, textAlign = TextAlign.Center)
+            Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(iconSize))
             if (size > 52.dp) {
+                Spacer(Modifier.height(2.dp))
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = (size.value * 0.14f).sp,
+                    fontSize = (size.value * 0.13f).sp,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -119,6 +153,8 @@ private fun NavButton(
 @Composable
 private fun ActivateButton(size: Dp, enabled: Boolean, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
+    val iconSize = (size.value * 0.38f).dp
+
     Surface(
         onClick = onClick,
         modifier = Modifier.size(size),
@@ -132,25 +168,31 @@ private fun ActivateButton(size: Dp, enabled: Boolean, onClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("OK", fontSize = (size.value * 0.24f).sp, textAlign = TextAlign.Center)
+            Icon(Icons.Rounded.TouchApp, contentDescription = "Activate", modifier = Modifier.size(iconSize))
+            if (size > 52.dp) {
+                Spacer(Modifier.height(2.dp))
+                Text("OK", fontSize = (size.value * 0.15f).sp, textAlign = TextAlign.Center)
+            }
         }
     }
 }
 
 @Composable
-private fun SecondaryButton(
-    symbol: String,
+private fun SystemButton(
+    icon: ImageVector,
     label: String,
     size: Dp,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
+    val iconSize = (size.value * 0.4f).dp
+
     Surface(
         onClick = onClick,
         modifier = Modifier.size(size),
         enabled = enabled,
-        shape = MaterialTheme.shapes.small,
+        shape = RoundedCornerShape(12.dp),
         color = cs.surface,
         contentColor = if (enabled) cs.onSurface else cs.onSurface.copy(alpha = 0.38f),
         border = BorderStroke(1.dp, cs.outlineVariant),
@@ -160,12 +202,12 @@ private fun SecondaryButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(symbol, fontSize = (size.value * 0.28f).sp, textAlign = TextAlign.Center)
+            Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(iconSize))
             if (size > 52.dp) {
+                Spacer(Modifier.height(2.dp))
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = (size.value * 0.14f).sp,
+                    fontSize = (size.value * 0.13f).sp,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -178,32 +220,48 @@ private fun SecondaryButton(
 // ── D-pad cross ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun DPadCross(
-    buttonSize: Dp,
-    gap: Dp,
-    enabled: Boolean,
-    onSend: (String, String) -> Unit,
-) {
+private fun DPadCross(buttonSize: Dp, gap: Dp, enabled: Boolean, onSend: (String, String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-        // Row 1:  [ empty ]  [ scroll fwd ]  [ empty ]
+        // Row 1: [ · ] [ scroll fwd ] [ · ]
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
             Spacer(Modifier.size(buttonSize))
-            NavButton("▲", "Scroll", buttonSize, enabled) { onSend(ACTION_SCROLL_FWD, "Scroll Forward") }
+            NavButton(Icons.Rounded.KeyboardArrowUp, "Scroll", buttonSize, enabled) {
+                onSend(ACTION_SCROLL_FWD, "Scroll Forward")
+            }
             Spacer(Modifier.size(buttonSize))
         }
-        // Row 2:  [ prev ]  [ activate ]  [ next ]
+        // Row 2: [ prev ] [ activate ] [ next ]
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-            NavButton("◀", "Prev", buttonSize, enabled) { onSend(ACTION_PREVIOUS, "Previous") }
+            NavButton(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Prev", buttonSize, enabled) {
+                onSend(ACTION_PREVIOUS, "Previous")
+            }
             ActivateButton(buttonSize, enabled) { onSend(ACTION_ACTIVATE, "Activate") }
-            NavButton("▶", "Next", buttonSize, enabled) { onSend(ACTION_NEXT, "Next") }
+            NavButton(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Next", buttonSize, enabled) {
+                onSend(ACTION_NEXT, "Next")
+            }
         }
-        // Row 3:  [ empty ]  [ scroll back ]  [ empty ]
+        // Row 3: [ · ] [ scroll back ] [ · ]
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
             Spacer(Modifier.size(buttonSize))
-            NavButton("▼", "Scroll", buttonSize, enabled) { onSend(ACTION_SCROLL_BACK, "Scroll Backward") }
+            NavButton(Icons.Rounded.KeyboardArrowDown, "Scroll", buttonSize, enabled) {
+                onSend(ACTION_SCROLL_BACK, "Scroll Backward")
+            }
             Spacer(Modifier.size(buttonSize))
         }
     }
+}
+
+// ── Section label ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.outline,
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = TextAlign.Center,
+    )
 }
 
 // ── Remote panel ──────────────────────────────────────────────────────────────
@@ -216,36 +274,40 @@ private fun RemotePanel(
     onSend: (String, String) -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxHeight()) {
-        // Button size scales with window height; clamped to a sensible range.
         val buttonSize: Dp = (maxHeight.value * 0.105f).coerceIn(36f, 86f).dp
         val gap = 4.dp
-        val panelWidth = buttonSize * 3 + gap * 2 + 16.dp
+        val rowWidth = buttonSize * 3 + gap * 2
+        val panelWidth = rowWidth + 24.dp
         val enabled = device != null
 
         Column(
             modifier = Modifier
                 .width(panelWidth)
                 .fillMaxHeight()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Device status
+            // ── Device status ────────────────────────────────────────────────
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.width(rowWidth),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (checking) {
-                    CircularProgressIndicator(Modifier.size(10.dp), strokeWidth = 1.5.dp)
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(10.dp),
+                        strokeWidth = 1.5.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 } else {
-                    val color = if (device != null) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.error
-                    Box(Modifier.size(8.dp).background(color, CircleShape))
+                    val dotColor = if (device != null) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.error
+                    Box(Modifier.size(8.dp).background(dotColor, CircleShape))
                     Text(
                         text = device ?: "No device",
                         style = MaterialTheme.typography.bodySmall,
-                        color = color,
+                        color = dotColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
@@ -256,40 +318,52 @@ private fun RemotePanel(
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     modifier = Modifier.height(24.dp),
                 ) {
-                    Text("↺", style = MaterialTheme.typography.labelSmall)
+                    Icon(
+                        Icons.Rounded.Refresh,
+                        contentDescription = "Refresh",
+                        modifier = Modifier.size(14.dp),
+                    )
                 }
             }
 
-            HorizontalDivider()
+            HorizontalDivider(modifier = Modifier.width(rowWidth), color = MaterialTheme.colorScheme.outlineVariant)
 
             Spacer(Modifier.weight(1f))
 
-            // D-pad cross
+            // ── Navigation D-pad ─────────────────────────────────────────────
+            SectionLabel("Navegação")
             DPadCross(buttonSize, gap, enabled, onSend)
 
             Spacer(Modifier.height(4.dp))
 
-            // System row: Back · Home · Recents
+            // ── Swipe ────────────────────────────────────────────────────────
+            SectionLabel("Swipe")
             Row(
-                modifier = Modifier.width(buttonSize * 3 + gap * 2),
+                modifier = Modifier.width(rowWidth),
                 horizontalArrangement = Arrangement.spacedBy(gap),
             ) {
-                SecondaryButton("⬅", "Back",    buttonSize, enabled) { onSend(ACTION_BACK,    "Back") }
-                SecondaryButton("⌂", "Home",    buttonSize, enabled) { onSend(ACTION_HOME,    "Home") }
-                SecondaryButton("▣", "Recents", buttonSize, enabled) { onSend(ACTION_RECENTS, "Recents") }
-            }
-
-            // Swipe row: Swipe Up · Swipe Down · (spacer)
-            Row(
-                modifier = Modifier.width(buttonSize * 3 + gap * 2),
-                horizontalArrangement = Arrangement.spacedBy(gap),
-            ) {
-                SecondaryButton("↑", "Swipe↑", buttonSize, enabled) { onSend(ACTION_SWIPE_UP,   "Swipe Up") }
-                SecondaryButton("↓", "Swipe↓", buttonSize, enabled) { onSend(ACTION_SWIPE_DOWN, "Swipe Down") }
+                NavButton(Icons.Rounded.SwipeUp, "Swipe ↑", buttonSize, enabled) {
+                    onSend(ACTION_SWIPE_UP, "Swipe Up")
+                }
+                NavButton(Icons.Rounded.SwipeDown, "Swipe ↓", buttonSize, enabled) {
+                    onSend(ACTION_SWIPE_DOWN, "Swipe Down")
+                }
                 Spacer(Modifier.size(buttonSize))
             }
 
             Spacer(Modifier.weight(1f))
+
+            // ── System (bottom) ──────────────────────────────────────────────
+            HorizontalDivider(modifier = Modifier.width(rowWidth), color = MaterialTheme.colorScheme.outlineVariant)
+            SectionLabel("Sistema")
+            Row(
+                modifier = Modifier.width(rowWidth),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                SystemButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back",    buttonSize, enabled) { onSend(ACTION_BACK,    "Back") }
+                SystemButton(Icons.Rounded.Home,                   "Home",    buttonSize, enabled) { onSend(ACTION_HOME,    "Home") }
+                SystemButton(Icons.Rounded.Apps,                   "Recents", buttonSize, enabled) { onSend(ACTION_RECENTS, "Recents") }
+            }
         }
     }
 }
@@ -311,7 +385,7 @@ private fun LogPanel(entries: List<String>, modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(cs.surfaceVariant.copy(alpha = 0.35f), MaterialTheme.shapes.small)
+                .background(cs.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                 .padding(8.dp)
                 .verticalScroll(scrollState),
         ) {
@@ -324,7 +398,11 @@ private fun LogPanel(entries: List<String>, modifier: Modifier = Modifier) {
                             text = entry,
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-                            color = if (entry.startsWith("✗")) cs.error else cs.onSurfaceVariant,
+                            color = when {
+                                entry.startsWith("✗") -> cs.error
+                                entry.startsWith("✓") -> cs.primary
+                                else -> cs.onSurfaceVariant
+                            },
                         )
                     }
                 }
@@ -366,7 +444,7 @@ fun RemoteControlApp() {
 
     LaunchedEffect(Unit) { refreshDevice() }
 
-    MaterialTheme {
+    MaterialTheme(colorScheme = InterColorScheme) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Row(modifier = Modifier.fillMaxSize()) {
                 RemotePanel(
@@ -375,7 +453,7 @@ fun RemoteControlApp() {
                     onRefresh = { refreshDevice() },
                     onSend = { action, label -> send(action, label) },
                 )
-                VerticalDivider()
+                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 LogPanel(
                     entries = logEntries,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
