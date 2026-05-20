@@ -2,7 +2,7 @@
 
 Biblioteca de testes de acessibilidade para Android. Fornece o driver de teste, asserções e modelos de dados para validar a experiência de usuários cegos em qualquer app Android.
 
-Esta é a dependência que você adiciona ao seu projeto. Os demais módulos (`blindcheck-tracker`, `blindcheck-interactor`) são infraestrutura interna.
+**Esta é a única dependência que você precisa adicionar ao seu projeto.** Os demais módulos (`blindcheck-tracker`, `blindcheck-interactor`) são infraestrutura interna.
 
 ---
 
@@ -14,6 +14,26 @@ dependencies {
     androidTestImplementation(project(":blindcheck-testing"))
 }
 ```
+
+---
+
+## Setup mínimo
+
+```kotlin
+@get:Rule
+val composeRule = createAndroidComposeRule<MainActivity>()
+
+private val setup  = AndroidAccessibilitySetup.create()
+private val driver = AndroidAccessibilityTestDriver.create()
+
+@Before
+fun setUp() {
+    setup.ensureAccessibilityEnabled() // obrigatório — ativa o pipeline de acessibilidade
+    composeRule.waitForIdle()
+}
+```
+
+Veja exemplos de testes completos em [`blindcheck-test-app`](../blindcheck-test-app/README.md).
 
 ---
 

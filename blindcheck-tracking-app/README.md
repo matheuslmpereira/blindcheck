@@ -16,17 +16,27 @@ Aplicativo Android para monitoramento do stream de eventos de acessibilidade em 
 
 ## Como usar
 
-### 1. Instalar o app no dispositivo
+### Jeito rápido (recomendado)
+
+```bash
+make session
+```
+
+Instala tudo, ativa o serviço e abre o desktop remote em um único comando.
+
+### Passo a passo
+
+#### 1. Instalar o app no dispositivo
 
 ```bash
 ./gradlew :blindcheck-tracking-app:installDebug
 ```
 
-### 2. Ativar o serviço de acessibilidade
+#### 2. Ativar o serviço de acessibilidade
 
 Via makefile:
 ```bash
-make enable-tracking
+make enable-tracker
 ```
 
 Ou manualmente: **Configurações → Acessibilidade → Serviços instalados → BlindCheck**.
@@ -70,9 +80,17 @@ Ordenação alternável (mais novo / mais antigo primeiro).
 
 ---
 
-## Controle remoto via ADB
+## Controle remoto
 
-Com o serviço ativo, você pode disparar gestos remotamente:
+### Desktop (recomendado)
+
+O `blindcheck-desktop` oferece uma interface visual com log de anúncios em tempo real. Use `make session` para iniciá-lo junto com os apps.
+
+Ver [blindcheck-desktop/README.md](../blindcheck-desktop/README.md).
+
+### Via terminal (ADB)
+
+Com o serviço ativo, você pode disparar gestos diretamente:
 
 ```bash
 make next        # swipe direita (próximo elemento TalkBack)
