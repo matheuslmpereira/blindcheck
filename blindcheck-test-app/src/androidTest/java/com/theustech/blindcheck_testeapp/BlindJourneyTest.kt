@@ -194,6 +194,77 @@ class BlindJourneyTest {
         driver.assertCurrentWindowContains(FocusExpectation(textContains = "Frutas"))
     }
 
+    // ─── Terceira fruta: jornada completa ────────────────────────────────────
+
+    /**
+     * Jornada: login → lista → terceira fruta (Uva) → leitura da descrição.
+     *
+     * Simula um usuário cego que:
+     *   1. Faz login com swipes campo a campo
+     *   2. Navega pela lista de frutas até chegar na terceira (Uva)
+     *   3. Abre o detalhe com duplo-toque
+     *   4. Percorre os elementos da tela de detalhe com swipes
+     *   5. Ouve a descrição da fruta anunciada pelo TalkBack
+     *
+     * Frutas na lista (ordem determinística):
+     *   1ª Banana · 2ª Laranja · 3ª Uva ← objetivo
+     */
+    @Test
+    fun fruitListJourney_thirdFruit_openDetailAndReadDescription() = runTest {
+        // ── 1. Login ──────────────────────────────────────────────────────────
+        loginViaSwipeNavigation()
+
+        // ── 2. Tela de lista: chega na terceira fruta com swipes ─────────────
+
+        // → swipe: heading "Frutas"
+        actions.next()
+        driver.assertFocused(FocusExpectation(textContains = "Frutas"))
+
+        // → swipe: 1ª fruta — Banana
+        //   [TalkBack anuncia: "Banana, Fruta amarela, doce e facil de descascar."]
+        actions.next()
+        driver.assertFocused(FocusExpectation(textContains = "Banana"))
+
+        // → swipe: 2ª fruta — Laranja
+        //   [TalkBack anuncia: "Laranja, Fruta citrica com gomos e bastante suco."]
+        actions.next()
+        driver.assertFocused(FocusExpectation(textContains = "Laranja"))
+
+        // → swipe: 3ª fruta — Uva  ← chegamos ao objetivo
+        //   [TalkBack anuncia: "Uva, Fruta pequena que cresce em cachos."]
+        actions.next()
+        driver.assertFocused(FocusExpectation(textContains = "Uva"))
+
+        // ── 3. Abre o detalhe da Uva ─────────────────────────────────────────
+        //   [TalkBack anuncia: "Uva"] ao entrar na tela de detalhe
+        actions.activate()
+        composeRule.waitForIdle()
+
+        // ── 4. Tela de detalhe: lê cada elemento com swipes ─────────────────
+
+        // → swipe: botão Voltar
+        //   [TalkBack anuncia: "Voltar, botão"]
+        actions.next()
+        driver.assertFocused(FocusExpectation(textContains = "Voltar", clickable = true))
+
+        // → swipe: imagem da fruta (Box com contentDescription explícito)
+        //   [TalkBack anuncia: "Imagem de Uva"]
+        actions.next()
+        driver.assertFocused(FocusExpectation(contentDescriptionContains = "Imagem de Uva"))
+
+        // → swipe: título da fruta
+        //   [TalkBack anuncia: "Uva"]
+        actions.next()
+        driver.assertFocused(FocusExpectation(textContains = "Uva"))
+
+        // → swipe: descrição da fruta  ← leitura que queríamos validar
+        //   [TalkBack anuncia: "Fruta pequena que cresce em cachos."]
+        actions.next()
+        driver.assertFocused(
+            FocusExpectation(textContains = "Fruta pequena que cresce em cachos."),
+        )
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private suspend fun loginViaSwipeNavigation() {
