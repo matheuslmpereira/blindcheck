@@ -20,6 +20,38 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".BlindCheckTtsDataActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Blindchecktesteapp">
+            <intent-filter>
+                <action android:name="android.speech.tts.engine.CHECK_TTS_DATA" />
+                <action android:name="android.speech.tts.engine.GET_SAMPLE_TEXT" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".BlindCheckTextToSpeechService"
+            android:exported="true"
+            android:label="@string/tts_engine_name">
+            <intent-filter>
+                <action android:name="android.intent.action.TTS_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.speech.tts"
+                android:resource="@xml/blindcheck_tts_engine" />
+        </service>
+
+        <receiver
+            android:name=".TtsSmokeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.theustech.blindcheck.ACTION_TTS_SMOKE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

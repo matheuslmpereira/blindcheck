@@ -57,6 +57,8 @@ import com.theustech.blindcheck_testing.model.A11yEventRecord
 import com.theustech.blindcheck_tracker.AccessibilityEventType
 import com.theustech.blindcheck_tracker.TrackingEventStore
 import com.theustech.blindcheck_tracker.TrackingServiceStatus
+import com.theustech.blindcheck_tracker.TtsSpeechRecord
+import com.theustech.blindcheck_tracker.TtsSpeechStore
 import com.theustech.blindcheck_tracking_app.ui.theme.BlindchecktesteappTheme
 import kotlinx.coroutines.delay
 
@@ -82,6 +84,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
     var isRecording by remember { mutableStateOf(TrackingEventStore.shared.isRecording) }
     var isTrackingServiceEnabled by remember { mutableStateOf(readTrackingServiceEnabled(context)) }
     var events by remember { mutableStateOf(TrackingEventStore.shared.snapshot()) }
+    var ttsRecords by remember { mutableStateOf(TtsSpeechStore.shared.snapshot()) }
     var observedPackages by remember { mutableStateOf(TrackingEventStore.shared.observedPackagesSnapshot()) }
     var targetPackages by remember { mutableStateOf(TrackingEventStore.shared.targetPackagesSnapshot()) }
     var targetEventTypes by remember { mutableStateOf(TrackingEventStore.shared.targetEventTypesSnapshot()) }
@@ -91,6 +94,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
             isRecording = TrackingEventStore.shared.isRecording
             isTrackingServiceEnabled = readTrackingServiceEnabled(context)
             events = TrackingEventStore.shared.snapshot()
+            ttsRecords = TtsSpeechStore.shared.snapshot()
             observedPackages = TrackingEventStore.shared.observedPackagesSnapshot()
             targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
             targetEventTypes = TrackingEventStore.shared.targetEventTypesSnapshot()
@@ -100,6 +104,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
 
     fun refresh() {
         events = TrackingEventStore.shared.snapshot()
+        ttsRecords = TtsSpeechStore.shared.snapshot()
         observedPackages = TrackingEventStore.shared.observedPackagesSnapshot()
         targetPackages = TrackingEventStore.shared.targetPackagesSnapshot()
         targetEventTypes = TrackingEventStore.shared.targetEventTypesSnapshot()
@@ -316,16 +321,18 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 OutlinedButton(
                     onClick = {
                         TrackingEventStore.shared.clear()
+                        TtsSpeechStore.shared.clear()
                         refresh()
                     },
                 ) {
                     Text("Reset")
                 }
                 OutlinedButton(
-                    enabled = events.isNotEmpty(),
+                    enabled = events.isNotEmpty() || ttsRecords.isNotEmpty(),
                     onClick = {
                         val dump = buildEventDump(
                             events = sortedEvents,
+                            ttsRecords = ttsRecords.reversed(),
                             targetPackages = targetPackages,
                             targetEventTypes = targetEventTypes,
                             newestFirst = newestFirst,
@@ -352,7 +359,7 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "${events.size} events · ${observedPackages.size} apps seen",
+                    text = "${events.size} events · ${observedPackages.size} apps seen · ${ttsRecords.size} TTS",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
@@ -362,6 +369,10 @@ fun TrackingEventStreamScreen(modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+            }
+
+            ttsRecords.lastOrNull()?.let { speech ->
+                LatestTtsRow(speech = speech)
             }
 
             val listState = rememberLazyListState()
@@ -411,6 +422,37 @@ private fun ServiceWarningBanner(onOpenSettings: () -> Unit, modifier: Modifier 
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun LatestTtsRow(speech: TtsSpeechRecord, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = "Latest TTS",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = speech.text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = "${speech.timestamp} · ${speech.voiceName ?: "default voice"}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
         }
     }
 }
@@ -524,6 +566,7 @@ private fun readTrackingServiceEnabled(context: Context): Boolean {
 
 private fun buildEventDump(
     events: List<A11yEventRecord>,
+    ttsRecords: List<TtsSpeechRecord>,
     targetPackages: List<String>,
     targetEventTypes: List<AccessibilityEventType>,
     newestFirst: Boolean,
@@ -533,6 +576,7 @@ private fun buildEventDump(
         appendLine("BlindCheck Event Dump")
         appendLine("Generated: $timestamp")
         appendLine("Events: ${events.size} | Order: ${if (newestFirst) "Newest first" else "Oldest first"}")
+        appendLine("TTS utterances: ${ttsRecords.size}")
         if (targetPackages.isNotEmpty()) {
             appendLine("Package filters: ${targetPackages.joinToString()}")
         }
@@ -554,6 +598,14 @@ private fun buildEventDump(
                 appendLine("  State: ${node.stateString()}")
             }
             appendLine()
+        }
+        if (ttsRecords.isNotEmpty()) {
+            appendLine("TTS")
+            ttsRecords.forEach { speech ->
+                appendLine("${speech.timestamp} · ${speech.voiceName ?: "default voice"}")
+                appendLine("  Text: ${speech.text}")
+                appendLine()
+            }
         }
     }.trimEnd()
 }

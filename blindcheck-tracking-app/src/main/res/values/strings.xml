@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">blindcheck-tracking-app</string>
+    <string name="tts_engine_name">BlindCheck TTS capture</string>
 </resources>
