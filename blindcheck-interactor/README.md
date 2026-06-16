@@ -30,6 +30,11 @@ Além de gravar no store, o serviço emite logs de acessibilidade legíveis via 
 | `FOCUS` | `TYPE_VIEW_ACCESSIBILITY_FOCUSED` | `FOCUS E-mail, Campo de texto, editável` |
 | `ANN` | `TYPE_ANNOUNCEMENT` / `TYPE_WINDOW_CONTENT_CHANGED` | `ANN Informe o e-mail` |
 | `WIN` | `TYPE_WINDOW_STATE_CHANGED` | `WIN Acessar conta` |
+| `EARCON` | Ação remota sem mudança de foco | `EARCON boundary-next` |
+
+O prefixo `TTS` usa a mesma tag `BlindCheckAnnounce`, mas é emitido pelo `BlindCheckTextToSpeechService` do `blindcheck-tracking-app`, não por este serviço de acessibilidade.
+
+`EARCON` é feedback sonoro inferido: quando `next` ou `previous` não gera novo foco dentro de um timeout curto, o serviço registra o limite de navegação. Ele não captura áudio real do TalkBack.
 
 **Deduplicação:** textos já anunciados em um evento FOCUS imediatamente anterior são suprimidos de eventos ANN subsequentes para evitar ruído (ex.: label "E-mail" não reaparece como ANN quando o erro do mesmo campo dispara).
 

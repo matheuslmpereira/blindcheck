@@ -17,6 +17,17 @@ TalkBack applies its own heuristics based on:
 
 The MVP validates observable accessibility events, node snapshots, user-action results, and accessible feedback, not universal exact speech.
 
+## TTS capture limitations
+
+BlindCheck can capture exact text passed to Android text-to-speech only in controlled runs where the BlindCheck TTS engine is selected as the device text-to-speech output.
+
+This is useful as a bot/reference log, but it has important limits:
+
+* it captures `SynthesisRequest` text received by the BlindCheck engine, not arbitrary audio output;
+* it will not see TalkBack speech if TalkBack is using Google TTS or another engine;
+* it returns silent audio, so the feature is for logging and assertions, not for human listening;
+* captured text may contain sensitive UI content and should be treated as sensitive test data.
+
 ## AccessibilityService limitations
 
 Some actions depend on Android permissions and service capabilities.

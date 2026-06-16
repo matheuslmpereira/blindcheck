@@ -38,6 +38,33 @@ Each event should show:
 * class name;
 * focused/clickable/editable state when available.
 
+### TTS speech capture
+
+Expose an opt-in `TextToSpeechService` engine for controlled emulator/device runs.
+
+When the BlindCheck TTS engine is selected as the system text-to-speech output, it should:
+
+* capture each `SynthesisRequest` text;
+* keep a short in-memory speech log;
+* show the latest captured speech in the tracking app;
+* emit `TTS <text>` to the same `BlindCheckAnnounce` logcat channel used by the desktop app;
+* return silent PCM audio so bots can observe requested speech without depending on device audio.
+
+This captures text sent to the selected TTS engine. It does not capture TalkBack output when another TTS engine is active.
+
+### Inferred earcon feedback
+
+Some TalkBack feedback is a short sound instead of TTS speech.
+
+For remote `next` and `previous` actions, the tracker should infer navigation-boundary feedback when no new accessibility focus event arrives within a short timeout. The log format should be:
+
+```text
+EARCON boundary-next
+EARCON boundary-previous
+```
+
+This is an inferred bot-friendly signal, not raw audio capture.
+
 ### Package filter
 
 Allow filtering events by target app package.

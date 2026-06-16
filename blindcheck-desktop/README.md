@@ -55,13 +55,22 @@ Barra no topo mostrando o dispositivo conectado. Botão **Atualizar** para redet
 
 ### Log de anúncios
 
-Exibe em tempo real o que o TalkBack está anunciando no dispositivo. Atualiza a cada 500ms via polling de logcat.
+Exibe em tempo real os anúncios aproximados inferidos pelo serviço de acessibilidade e, quando o engine "BlindCheck TTS capture" está selecionado como saída TTS do sistema, o texto enviado de fato ao `TextToSpeechService`. Atualiza a cada 500ms via polling de logcat.
+
+O controle **TTS** no painel lateral alterna o engine TTS do Android entre:
+
+* **BlindCheck**: captura o texto enviado ao `TextToSpeechService`;
+* **Sistema**: volta para o engine TTS padrão do emulador/dispositivo e deixa de capturar TTS real.
+
+Ao alternar o controle **TTS**, o desktop reinicia TalkBack + BlindCheck no emulador para evitar conexões TTS antigas do TalkBack e manter a captura estável.
 
 | Indicador | Significado |
 |---|---|
 | ♿ (ícone acessibilidade, cinza) | Evento FOCUS — elemento que recebeu foco TalkBack |
 | 🔊 (ícone volume, laranja) | Evento ANN — anúncio ou live region |
 | 📱 (ícone smartphone, laranja) | Evento WIN — mudança de tela ou janela |
+| TTS | Texto recebido pelo engine TTS controlado do BlindCheck |
+| earcon | Feedback sonoro inferido, como limite de navegação |
 | ✓ / ✗ | Ação enviada com sucesso / erro |
 
 **Limpar log:** botão 🗑️ no canto superior direito do painel, ou `Delete` no teclado.
@@ -86,7 +95,11 @@ O log de anúncios faz polling de:
 adb logcat -d -s BlindCheckAnnounce:I
 ```
 
-O serviço emite linhas com prefixos `FOCUS`, `ANN` e `WIN` que o desktop parseia para exibir cada tipo com visual distinto.
+O serviço emite linhas com prefixos `FOCUS`, `ANN`, `WIN`, `TTS` e `EARCON` que o desktop parseia para exibir cada tipo com visual distinto.
+
+O desktop mantém um conjunto de linhas de logcat já vistas para evitar repetir mensagens antigas no painel.
+
+`EARCON` é inferido quando uma ação `next` ou `previous` não muda o foco depois de um timeout curto. Ele não é captura de áudio real.
 
 ---
 

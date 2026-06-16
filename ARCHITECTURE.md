@@ -389,6 +389,30 @@ O serviço emite três prefixos de log:
 | `FOCUS` | `TYPE_VIEW_ACCESSIBILITY_FOCUSED` | Elemento que recebeu foco; inclui texto, role e estados |
 | `ANN` | `TYPE_ANNOUNCEMENT` / `TYPE_WINDOW_CONTENT_CHANGED` | Anúncio dinâmico, live region ou texto de erro |
 | `WIN` | `TYPE_WINDOW_STATE_CHANGED` | Mudança de tela ou janela |
+| `TTS` | `TextToSpeechService.onSynthesizeText()` | Texto enviado ao engine TTS controlado do BlindCheck |
+| `EARCON` | Ação remota sem mudança de foco | Feedback sonoro inferido, como limite de navegação |
+
+### Fluxo TTS controlado
+
+```
+TalkBack / cliente TTS
+  │  SynthesisRequest
+  ▼
+BlindCheckTextToSpeechService
+  │  TtsSpeechStore.record()
+  │  Log.i("BlindCheckAnnounce", "TTS <texto>")
+  │  silent PCM callback
+  ▼
+tracking app / adb logcat / blindcheck-desktop
+```
+
+Esse fluxo só observa texto quando o engine "BlindCheck TTS capture" está selecionado como saída TTS do sistema. Ele serve para logs e verificação automatizada; não substitui teste auditivo manual com o engine TTS real do usuário.
+
+### Feedback sonoro inferido
+
+Alguns sons do TalkBack, como o feedback ao tentar avançar após o último elemento, não passam pelo `TextToSpeechService`.
+
+Para apoiar bots, o `TrackingAccessibilityService` emite `EARCON boundary-next` ou `EARCON boundary-previous` quando uma ação remota `next`/`previous` não gera novo `TYPE_VIEW_ACCESSIBILITY_FOCUSED` dentro de um curto timeout. Esse log representa o comportamento observável de limite de navegação; ele não é uma captura de áudio real.
 
 ### Deduplicação de ruído
 

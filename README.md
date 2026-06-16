@@ -34,7 +34,7 @@ cd blindcheck
 
 ### 2. Sessão de exploração manual (recomendado para começar)
 
-Um único comando instala os apps, ativa o serviço e abre o desktop remote:
+Um único comando instala os apps, ativa o serviço, seleciona o engine TTS do BlindCheck e abre o desktop remote:
 
 ```bash
 make session
@@ -42,11 +42,20 @@ make session
 
 Isso executa, em ordem:
 1. Instala `blindcheck-tracking-app` e `blindcheck-test-app` no dispositivo
-2. Ativa o serviço de acessibilidade BlindCheck (junto ao TalkBack)
-3. Abre o `blindcheck-test-app` no dispositivo
-4. Inicia o `blindcheck-desktop` em background
+2. Garante que `blindcheck-tracking-app` está selecionado como engine TTS do sistema para capturar entradas `TTS`
+3. Garante que o serviço de acessibilidade BlindCheck está ativo junto ao TalkBack
+4. Abre o `blindcheck-test-app` no dispositivo
+5. Inicia o `blindcheck-desktop` em background, se ele ainda não estiver rodando
 
 No desktop você verá o painel de controle e o log de anúncios em tempo real.
+
+Para reabrir o app de teste e o desktop sem reinstalar APKs, use:
+
+```bash
+make resume-session
+```
+
+Esse caminho evita recriar desnecessariamente o processo do engine TTS durante uma sessão já configurada.
 
 ### 3. Rodar os testes automatizados
 
@@ -281,9 +290,12 @@ Detalhes completos em [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```bash
 make session          # instalação completa + desktop (início de sessão)
+make resume-session   # retoma a sessão sem reinstalar APKs
 make test             # roda todos os testes instrumentados
 make enable-tracker   # ativa o serviço de acessibilidade
+make enable-tts       # seleciona o engine TTS do BlindCheck
+make tts-smoke        # valida se o engine TTS padrão chega ao BlindCheck
 make disable-a11y     # desativa acessibilidade no dispositivo
-make check-a11y       # verifica serviços ativos
+make check-a11y       # verifica serviços ativos e engine TTS
 make logs             # logcat filtrado por tags BlindCheck
 ```

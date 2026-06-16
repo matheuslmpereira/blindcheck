@@ -53,14 +53,14 @@ Success criteria:
 
 Features:
 
-* fake TTS engine;
-* capture synthesized utterances;
-* export speech log;
+* fake TTS engine; initial engine implemented in `:blindcheck-tracking-app`;
+* capture synthesized utterances in memory and logcat;
+* export speech log through the tracking app dump;
 * compare expected approximate speech.
 
 Success criteria:
 
-* developer can inspect the text sent to TTS in a controlled emulator.
+* developer can inspect the text sent to TTS in a controlled emulator when BlindCheck is selected as the system TTS engine.
 
 ## Future — Android Studio plugin
 
