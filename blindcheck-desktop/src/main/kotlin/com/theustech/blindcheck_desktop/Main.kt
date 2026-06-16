@@ -84,7 +84,12 @@ private val ADB = resolveAdb()
 // ── Broadcast constants ───────────────────────────────────────────────────────
 
 private const val TRACKING_PKG       = "com.theustech.blindcheck_tracking_app"
+private const val TRACKING_SERVICE   = "$TRACKING_PKG/com.theustech.blindcheck_interactor.TrackingAccessibilityService"
+private const val TALKBACK_SERVICE   = "com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService"
+private const val TALKBACK_PKG       = "com.google.android.marvin.talkback"
 private const val ANNOUNCE_TAG       = "BlindCheckAnnounce"
+private const val CAPTURE_TTS_ENGINE = TRACKING_PKG
+private const val SYSTEM_TTS_ENGINE  = "com.google.android.tts"
 private const val ACTION_NEXT        = "com.theustech.blindcheck.ACTION_NEXT"
 private const val ACTION_PREVIOUS    = "com.theustech.blindcheck.ACTION_PREVIOUS"
 private const val ACTION_ACTIVATE    = "com.theustech.blindcheck.ACTION_ACTIVATE"
@@ -113,10 +118,64 @@ private fun runAdb(vararg args: String): AdbResult = try {
 private fun sendBroadcast(action: String): AdbResult =
     runAdb("shell", "am", "broadcast", "-p", TRACKING_PKG, "-a", action)
 
+private fun currentTtsEngine(): String? {
+    val result = runAdb("shell", "settings", "get", "secure", "tts_default_synth")
+    if (!result.success) return null
+    return result.output.trim().takeUnless { it.isBlank() || it == "null" }
+}
+
+private fun readEnabledTtsPlugins(): List<String> {
+    val result = runAdb("shell", "settings", "get", "secure", "tts_enabled_plugins")
+    if (!result.success) return emptyList()
+    return result.output.trim()
+        .takeUnless { it.isBlank() || it == "null" }
+        ?.split(':')
+        ?.map { it.trim() }
+        ?.filter { it.isNotBlank() }
+        .orEmpty()
+}
+
+private fun configureAndroidTtsCapture(enabled: Boolean, fallbackEngine: String?): AdbResult {
+    val targetEngine = if (enabled) {
+        CAPTURE_TTS_ENGINE
+    } else {
+        fallbackEngine?.takeUnless { it == CAPTURE_TTS_ENGINE } ?: SYSTEM_TTS_ENGINE
+    }
+    if (currentTtsEngine() == targetEngine) return AdbResult(success = true, output = "TTS engine already $targetEngine")
+    if (enabled) {
+        val plugins = (readEnabledTtsPlugins() + CAPTURE_TTS_ENGINE).distinct()
+        val pluginResult = runAdb(
+            "shell",
+            "settings",
+            "put",
+            "secure",
+            "tts_enabled_plugins",
+            plugins.joinToString(":"),
+        )
+        if (!pluginResult.success) return pluginResult
+    }
+    val engineResult = runAdb("shell", "settings", "put", "secure", "tts_default_synth", targetEngine)
+    if (!engineResult.success) return engineResult
+    return restartAccessibilityForTtsSwitch()
+}
+
 private fun connectedDevice(): String? {
     val result = runAdb("devices")
     return result.output.lines().drop(1).firstOrNull { it.contains("\tdevice") }
         ?.substringBefore("\t")?.trim()
+}
+
+private fun restartAccessibilityForTtsSwitch(): AdbResult {
+    val disableServices = runAdb("shell", "settings", "put", "secure", "enabled_accessibility_services", "null")
+    if (!disableServices.success) return disableServices
+    val disableAccessibility = runAdb("shell", "settings", "put", "secure", "accessibility_enabled", "0")
+    if (!disableAccessibility.success) return disableAccessibility
+    runAdb("shell", "am", "force-stop", TALKBACK_PKG)
+    Thread.sleep(1_000)
+    val services = "$TALKBACK_SERVICE:$TRACKING_SERVICE"
+    val enableServices = runAdb("shell", "settings", "put", "secure", "enabled_accessibility_services", services)
+    if (!enableServices.success) return enableServices
+    return runAdb("shell", "settings", "put", "secure", "accessibility_enabled", "1")
 }
 
 // Parses a logcat line and returns the message after the tag, or null.
@@ -289,7 +348,10 @@ private fun SectionLabel(text: String) {
 private fun RemotePanel(
     device: String?,
     checking: Boolean,
+    ttsCaptureEnabled: Boolean,
+    applyingTtsMode: Boolean,
     onRefresh: () -> Unit,
+    onTtsCaptureChange: (Boolean) -> Unit,
     onSend: (String, String) -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxHeight()) {
@@ -341,6 +403,47 @@ private fun RemotePanel(
                         Icons.Rounded.Refresh,
                         contentDescription = "Refresh",
                         modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.width(rowWidth), color = MaterialTheme.colorScheme.outlineVariant)
+
+            Row(
+                modifier = Modifier.width(rowWidth),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.RecordVoiceOver,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.secondary,
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "TTS",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                    Text(
+                        text = if (ttsCaptureEnabled) "BlindCheck" else "Sistema",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (applyingTtsMode) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                } else {
+                    Switch(
+                        checked = ttsCaptureEnabled,
+                        enabled = enabled,
+                        onCheckedChange = onTtsCaptureChange,
                     )
                 }
             }
@@ -441,6 +544,54 @@ private fun LogEntryRow(entry: LogEntry) {
                 )
             }
         }
+        is LogEntry.Earcon -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(cs.tertiaryContainer.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.GraphicEq,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = cs.tertiary,
+                )
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = cs.onTertiaryContainer,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                )
+            }
+        }
+        is LogEntry.Tts -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(cs.secondaryContainer.copy(alpha = 0.35f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.RecordVoiceOver,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = cs.secondary,
+                )
+                Text(
+                    text = entry.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = cs.onSecondaryContainer,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                )
+            }
+        }
         is LogEntry.Action -> {
             Row(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -504,6 +655,12 @@ private fun LogPanel(
                 Spacer(Modifier.width(6.dp))
                 Icon(Icons.Rounded.Smartphone, null, Modifier.size(10.dp), tint = cs.primary)
                 Text("tela", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Rounded.RecordVoiceOver, null, Modifier.size(10.dp), tint = cs.secondary)
+                Text("tts", style = MaterialTheme.typography.labelSmall, color = cs.outline)
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Rounded.GraphicEq, null, Modifier.size(10.dp), tint = cs.tertiary)
+                Text("earcon", style = MaterialTheme.typography.labelSmall, color = cs.outline)
                 Spacer(Modifier.width(6.dp))
             }
             TextButton(
@@ -571,6 +728,8 @@ sealed interface LogEntry {
     data class Action(val text: String, val success: Boolean) : LogEntry
     data class Announce(val text: String, val isWindow: Boolean) : LogEntry
     data class Focus(val text: String) : LogEntry
+    data class Earcon(val text: String) : LogEntry
+    data class Tts(val text: String) : LogEntry
     data class System(val text: String) : LogEntry
 }
 
@@ -581,6 +740,9 @@ fun RemoteControlApp() {
     val scope = rememberCoroutineScope()
     var device by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
+    var ttsCaptureEnabled by remember { mutableStateOf(false) }
+    var applyingTtsMode by remember { mutableStateOf(false) }
+    var fallbackTtsEngine by remember { mutableStateOf<String?>(null) }
     val logEntries = remember { mutableStateListOf<LogEntry>() }
     val rawLines  = remember { mutableStateListOf<String>() }
     val focusRequester = remember { FocusRequester() }
@@ -598,11 +760,52 @@ fun RemoteControlApp() {
     fun refreshDevice() {
         scope.launch {
             checking = true
-            device = withContext(Dispatchers.IO) { connectedDevice() }
+            val status = withContext(Dispatchers.IO) {
+                val connected = connectedDevice()
+                val engine = if (connected != null) currentTtsEngine() else null
+                connected to engine
+            }
+            device = status.first
+            ttsCaptureEnabled = status.second == CAPTURE_TTS_ENGINE
+            if (status.second != null && status.second != CAPTURE_TTS_ENGINE) {
+                fallbackTtsEngine = status.second
+            }
             checking = false
             appendLog(LogEntry.System(
                 if (device != null) "● Device: $device" else "✗ No device — is ADB running?"
             ))
+        }
+    }
+
+    fun setCaptureTts(enabled: Boolean) {
+        if (device == null || applyingTtsMode || ttsCaptureEnabled == enabled) return
+        scope.launch {
+            applyingTtsMode = true
+            val before = withContext(Dispatchers.IO) { currentTtsEngine() }
+            val fallbackForCall = if (enabled && before != null && before != CAPTURE_TTS_ENGINE) {
+                fallbackTtsEngine = before
+                before
+            } else {
+                fallbackTtsEngine
+            }
+            val result = withContext(Dispatchers.IO) {
+                configureAndroidTtsCapture(enabled, fallbackForCall)
+            }
+            val engine = withContext(Dispatchers.IO) { currentTtsEngine() }
+            ttsCaptureEnabled = engine == CAPTURE_TTS_ENGINE
+            if (engine != null && engine != CAPTURE_TTS_ENGINE) {
+                fallbackTtsEngine = engine
+            }
+            applyingTtsMode = false
+            appendLog(
+                LogEntry.System(
+                    if (result.success) {
+                        "TTS: ${if (ttsCaptureEnabled) "BlindCheck" else "Sistema"}"
+                    } else {
+                        "TTS update failed: ${result.output}"
+                    },
+                ),
+            )
         }
     }
 
@@ -616,50 +819,46 @@ fun RemoteControlApp() {
     // Poll logcat for accessibility announcements emitted by the tracking service.
     LaunchedEffect(device) {
         if (device == null) return@LaunchedEffect
-        // Bootstrap: mark current logcat position so we only show new announcements.
-        var lastSeen = withContext(Dispatchers.IO) {
+        val seenLines = mutableSetOf<String>()
+        withContext(Dispatchers.IO) {
             runAdb("logcat", "-d", "-s", "$ANNOUNCE_TAG:I").output
-                .lines().lastOrNull { ANNOUNCE_TAG in it } ?: ""
-        }
-        while (true) {
-            delay(500)
-            val result = withContext(Dispatchers.IO) {
-                runAdb("logcat", "-d", "-s", "$ANNOUNCE_TAG:I")
-            }
-            val newLines = result.output.lines()
-                .filter { ANNOUNCE_TAG in it && it > lastSeen }
-            newLines.forEach { line ->
-                val msg = parseAnnouncement(line) ?: return@forEach
-                when {
-                    msg.startsWith("WIN ")   -> appendLog(LogEntry.Announce(msg.removePrefix("WIN "), isWindow = true))
-                    msg.startsWith("ANN ")   -> appendLog(LogEntry.Announce(msg.removePrefix("ANN "), isWindow = false))
-                    msg.startsWith("FOCUS ") -> appendLog(LogEntry.Focus(msg.removePrefix("FOCUS ")))
-                    else                     -> appendLog(LogEntry.Announce(msg, isWindow = false))
-                }
-            }
-            if (newLines.isNotEmpty()) lastSeen = newLines.last()
-        }
-    }
+                .lines()
+                .filter { ANNOUNCE_TAG in it }
+        }.forEach { seenLines.add(it) }
 
-    // Raw logcat stream for the announce tag — shown in debug/Logcat view.
-    LaunchedEffect(device) {
-        if (device == null) return@LaunchedEffect
-        var lastSeen = withContext(Dispatchers.IO) {
-            runAdb("logcat", "-d", "-s", "$ANNOUNCE_TAG:I").output
-                .lines().lastOrNull { ANNOUNCE_TAG in it } ?: ""
+        suspend fun consumeLine(line: String) {
+            rawLines.add(0, line)
+            if (rawLines.size > 500) rawLines.removeAt(rawLines.lastIndex)
+            val msg = parseAnnouncement(line) ?: return
+            when {
+                msg.startsWith("WIN ") -> appendLog(LogEntry.Announce(msg.removePrefix("WIN "), isWindow = true))
+                msg.startsWith("ANN ") -> appendLog(LogEntry.Announce(msg.removePrefix("ANN "), isWindow = false))
+                msg.startsWith("FOCUS ") -> appendLog(LogEntry.Focus(msg.removePrefix("FOCUS ")))
+                msg.startsWith("EARCON ") -> appendLog(LogEntry.Earcon(msg.removePrefix("EARCON ")))
+                msg.startsWith("TTS ") -> {
+                    val text = msg.removePrefix("TTS ")
+                    appendLog(LogEntry.Tts(text))
+                }
+                else -> appendLog(LogEntry.Announce(msg, isWindow = false))
+            }
         }
+
         while (true) {
             delay(500)
             val result = withContext(Dispatchers.IO) {
                 runAdb("logcat", "-d", "-s", "$ANNOUNCE_TAG:I")
             }
-            val newLines = result.output.lines()
-                .filter { ANNOUNCE_TAG in it && it > lastSeen }
-            newLines.forEach { line ->
-                rawLines.add(0, line)
-                if (rawLines.size > 500) rawLines.removeAt(rawLines.lastIndex)
+            result.output.lines()
+                .filter { ANNOUNCE_TAG in it }
+                .forEach { line ->
+                    if (seenLines.add(line)) consumeLine(line)
+                }
+            if (seenLines.size > 2_000) {
+                seenLines.clear()
+                result.output.lines()
+                    .filter { ANNOUNCE_TAG in it }
+                    .forEach { seenLines.add(it) }
             }
-            if (newLines.isNotEmpty()) lastSeen = newLines.last()
         }
     }
 
@@ -693,7 +892,10 @@ fun RemoteControlApp() {
                 RemotePanel(
                     device = device,
                     checking = checking,
+                    ttsCaptureEnabled = ttsCaptureEnabled,
+                    applyingTtsMode = applyingTtsMode,
                     onRefresh = { refreshDevice() },
+                    onTtsCaptureChange = { setCaptureTts(it) },
                     onSend = { action, label -> send(action, label) },
                 )
                 VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
