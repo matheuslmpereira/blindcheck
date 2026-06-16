@@ -3,6 +3,8 @@ package com.theustech.blindcheck_interactor
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -14,9 +16,12 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
 
     private val normalizer = A11yEventNormalizer()
     private val eventStore = TrackingEventStore.shared
+    private val boundaryHandler = Handler(Looper.getMainLooper())
 
     // Texts recently announced via FOCUS — used to suppress duplicate ANN entries.
     @Volatile private var lastFocusTexts: Set<String> = emptySet()
+    @Volatile private var currentFocusMessage: String? = null
+    @Volatile private var focusGeneration: Long = 0L
 
     override fun onServiceConnected() {
         instance = this
@@ -40,6 +45,8 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED -> {
                 val msg = buildFocusMessage(event) ?: return
+                currentFocusMessage = msg
+                focusGeneration += 1
                 lastFocusTexts = msg.split(", ").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
                 Log.i(ANNOUNCE_TAG, "FOCUS $msg")
             }
@@ -173,8 +180,8 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
     override fun execute(action: String) {
         Log.d(TAG, "Executing remote action: $action")
         when (action) {
-            RemoteActions.ACTION_NEXT           -> swipeHorizontal(forward = true)
-            RemoteActions.ACTION_PREVIOUS       -> swipeHorizontal(forward = false)
+            RemoteActions.ACTION_NEXT           -> navigateWithBoundaryFeedback(forward = true)
+            RemoteActions.ACTION_PREVIOUS       -> navigateWithBoundaryFeedback(forward = false)
             RemoteActions.ACTION_ACTIVATE       -> doubleTap()
             RemoteActions.ACTION_BACK           -> performGlobalAction(GLOBAL_ACTION_BACK)
             RemoteActions.ACTION_SCROLL_FORWARD -> twoFingerSwipeVertical(up = true)
@@ -184,6 +191,26 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
             RemoteActions.ACTION_SWIPE_UP       -> swipeVertical(up = true)
             RemoteActions.ACTION_SWIPE_DOWN     -> swipeVertical(up = false)
         }
+    }
+
+    private fun navigateWithBoundaryFeedback(forward: Boolean) {
+        val focusBeforeAction = currentFocusMessage
+        val generationBeforeAction = focusGeneration
+        swipeHorizontal(forward = forward)
+
+        if (focusBeforeAction == null) return
+
+        boundaryHandler.postDelayed(
+            {
+                val focusDidNotMove = focusGeneration == generationBeforeAction &&
+                    currentFocusMessage == focusBeforeAction
+                if (focusDidNotMove) {
+                    val direction = if (forward) "boundary-next" else "boundary-previous"
+                    Log.i(ANNOUNCE_TAG, "EARCON $direction")
+                }
+            },
+            BOUNDARY_FEEDBACK_TIMEOUT_MS,
+        )
     }
 
     // TalkBack interprets a right swipe as "next element", left swipe as "previous".
@@ -240,6 +267,7 @@ class TrackingAccessibilityService : AccessibilityService(), ActionExecutor {
 
     companion object {
         private const val TAG = "BlindCheckTracker"
+        private const val BOUNDARY_FEEDBACK_TIMEOUT_MS = 700L
         const val ANNOUNCE_TAG = "BlindCheckAnnounce"
 
         @Volatile
