@@ -31,6 +31,13 @@ session: install-all enable-tts enable-tracker open-test-app desktop
 .PHONY: resume-session
 resume-session: enable-tts enable-tracker open-test-app desktop
 
+## Builds + installs both apps, enables tracker + TTS capture, opens the test app, without desktop
+.PHONY: terminal-session
+terminal-session: install-all enable-tts enable-tracker open-test-app
+
+.PHONY: resume-terminal-session
+resume-terminal-session: enable-tts enable-tracker open-test-app
+
 .PHONY: install-all
 install-all:
 	./gradlew :blindcheck-tracking-app:installDebug :blindcheck-test-app:installDebug

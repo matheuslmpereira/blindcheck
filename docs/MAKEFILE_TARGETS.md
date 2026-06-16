@@ -14,6 +14,8 @@ Session setup targets should be idempotent:
 
 Use a separate `resume-session` target for returning to an already configured emulator without reinstalling APKs. Reinstalling the tracking app can recreate the process that hosts the TTS engine and may cause TalkBack to announce the selected engine again.
 
+Use `terminal-session` or `resume-terminal-session` when an agent needs logcat feedback only and should not launch the desktop remote.
+
 ```makefile
 ADB=adb
 TRACKING_SERVICE=com.theustech.blindcheck.tracker/.TrackingAccessibilityService
@@ -26,6 +28,12 @@ devices:
 .PHONY: install-all
 install-all:
 	./gradlew :blindcheck-tracking-app:installDebug :blindcheck-test-app:installDebug
+
+.PHONY: terminal-session
+terminal-session: install-all enable-tts enable-tracker open-test-app
+
+.PHONY: resume-terminal-session
+resume-terminal-session: enable-tts enable-tracker open-test-app
 
 .PHONY: enable-tracker
 enable-tracker:

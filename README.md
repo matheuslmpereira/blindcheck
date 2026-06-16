@@ -291,6 +291,8 @@ Detalhes completos em [ARCHITECTURE.md](ARCHITECTURE.md).
 ```bash
 make session          # instalação completa + desktop (início de sessão)
 make resume-session   # retoma a sessão sem reinstalar APKs
+make terminal-session # instalação completa sem desktop, para validação por terminal
+make resume-terminal-session # retoma sem reinstalar APKs nem abrir desktop
 make test             # roda todos os testes instrumentados
 make enable-tracker   # ativa o serviço de acessibilidade
 make enable-tts       # seleciona o engine TTS do BlindCheck
@@ -299,3 +301,5 @@ make disable-a11y     # desativa acessibilidade no dispositivo
 make check-a11y       # verifica serviços ativos e engine TTS
 make logs             # logcat filtrado por tags BlindCheck
 ```
+
+Para validação agentica sem desktop, veja [Terminal Agent Testing](docs/TERMINAL_AGENT_TESTING.md).
