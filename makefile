@@ -169,6 +169,10 @@ tts-smoke:
 tts-smoke-explicit:
 	$(BROADCAST) $(ACTION_TTS_SMOKE) --es com.theustech.blindcheck.EXTRA_TTS_TEXT BlindCheck_TTS_smoke_test --es com.theustech.blindcheck.EXTRA_TTS_ENGINE_PACKAGE $(TTS_ENGINE)
 
+.PHONY: navgraph-tts-matrix
+navgraph-tts-matrix:
+	./scripts/run-navgraph-tts-matrix.sh
+
 ## Watch accessibility event logs (BlindCheckRemote + BlindCheckTracker tags)
 .PHONY: logs
 logs:

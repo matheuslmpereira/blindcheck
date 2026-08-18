@@ -123,6 +123,7 @@ expectError {
 * `textContains`
 * `contentDescriptionEquals`
 * `contentDescriptionContains`
+* `viewIdResourceNameEquals`
 * `clickable`
 * `editable`
 * `enabled`
