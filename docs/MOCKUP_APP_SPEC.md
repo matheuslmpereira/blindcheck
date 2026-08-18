@@ -72,7 +72,8 @@ changes one accessibility variable from the baseline:
 * `Experimento NavGraph: IDs únicos por tela`;
 * `Experimento NavGraph: semântica recriada`;
 * `Experimento NavGraph: título de painel`;
-* `Experimento NavGraph: foco imperativo`.
+* `Experimento NavGraph: foco imperativo`;
+* `Experimento NavGraph: reset agnóstico pela lib`.
 
 The final `Experimento NavGraph: rótulos únicos + título de painel` scenario
 is retained as an experimental control. Different button labels are not an
@@ -83,8 +84,20 @@ accessible item is the destination title (`Tela 1`, `Tela 2`, or `Tela 3`). This
 prevents two identical `Ir para home` labels from obscuring whether a TTS request
 belongs to the old or new destination.
 
-The NavGraph destination in this matrix is implemented through the test app's
-`Screen` base class. `Screen.Render(backStackEntry)` waits for the destination
+The `reset agnóstico pela lib` scenario is the duplicate of the imperative case
+built on `:blindcheck-focus`. It keeps the ambiguous `Continuar` label on every
+destination and renders plain Compose content: no `AndroidView`, no `Screen`
+base class, and no per-screen registration. The destination root applies
+`Modifier.resetAccessibilityFocusOnEnter(key = backStackEntry.id)` and the
+library resolves the first accessible item from that subtree alone.
+
+`NavGraphAccessibilityApproach.LegacyCombinedReset` keeps its home action when
+launched from the approach matrix, because that is the configuration the app
+ships; measuring it without the home action would have measured a scenario that
+does not exist.
+
+The remaining NavGraph destinations in this matrix are implemented through the
+test app's `Screen` base class. `Screen.Render(backStackEntry)` waits for the destination
 to be `RESUMED`, for its root container to receive a layout, and for the screen
 to register its initial native accessibility target. It then schedules one
 `ACTION_ACCESSIBILITY_FOCUS` on the next Compose frame. This is lifecycle-driven

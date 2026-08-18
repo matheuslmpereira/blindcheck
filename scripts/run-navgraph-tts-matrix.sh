@@ -47,7 +47,7 @@ focus_page_one_button() {
     sleep 1
     local current_log
     current_log="$("${ADB_BIN}" logcat -d -s BlindCheckAnnounce:I)"
-    if rg -q "FOCUS ${expected_label}, Botão" <<< "${current_log}"; then
+    if grep -q "FOCUS ${expected_label}, Botão" <<< "${current_log}"; then
       return 0
     fi
   done
@@ -75,7 +75,7 @@ capture_approach() {
   "${ADB_BIN}" shell cat /sdcard/blindcheck-navgraph-tts.xml > "${tree_file}"
 
   local screen="NOT_TELA_2"
-  if rg -q 'text="Tela 2"' "${tree_file}"; then
+  if grep -q 'text="Tela 2"' "${tree_file}"; then
     screen="TELA_2"
   fi
 
@@ -97,14 +97,14 @@ capture_approach() {
   die "Exactly one connected Android device is required."
 
 TEST_APP_PATH="$("${ADB_BIN}" shell pm path "${TEST_APP_PACKAGE}")"
-rg -q '^package:' <<< "${TEST_APP_PATH}" ||
+grep -q '^package:' <<< "${TEST_APP_PATH}" ||
   die "The test app is not installed. Run 'make install-all' first."
 
 [[ "$("${ADB_BIN}" shell settings get secure tts_default_synth | tr -d '\r')" == "${TRACKING_PACKAGE}" ]] ||
   die "BlindCheck TTS is not selected. Run 'make enable-tts' first."
 
 ACCESSIBILITY_DUMP="$("${ADB_BIN}" shell dumpsys accessibility)"
-rg -q 'label=TalkBack' <<< "${ACCESSIBILITY_DUMP}" ||
+grep -q 'label=TalkBack' <<< "${ACCESSIBILITY_DUMP}" ||
   die "TalkBack is not bound. Run 'make enable-tracker' first."
 
 mkdir -p "${REPORT_DIR}"

@@ -22,7 +22,8 @@ O spy registra a solicitação enviada ao engine selecionado; não captura áudi
 
 ## Ambiente e método
 
-Execução em 17 de agosto de 2026:
+Execução em 17 de agosto de 2026, reexecutada em 18 de agosto de 2026 com as
+duas abordagens novas:
 
 * emulador `Medium_Phone`, API 36;
 * Google TalkBack e `TrackingAccessibilityService` habilitados;
@@ -118,7 +119,7 @@ a estrutura semântica, e a matriz controlada valida o feedback/foco real.
 
 ## Resultado 4 — matriz de abordagens isoladas
 
-Cada abordagem foi executada três vezes. As 21 transições terminaram na Tela 2
+Cada abordagem foi executada três vezes. As 27 transições terminaram na Tela 2
 e produziram a mesma sequência em todas as repetições:
 
 | Abordagem | Foco final | Sequência TTS após ativar |
@@ -129,7 +130,9 @@ e produziram a mesma sequência em todas as repetições:
 | semântica recriada com `key(page)` | `Continuar` | `Continuar → Button → Double-tap to activate` |
 | `paneTitle` | `Continuar` | `Tela 2 → Continuar → Button → Double-tap to activate` |
 | foco imperativo somente com `ACTION_ACCESSIBILITY_FOCUS` | `Tela 2` | `Tela 2` |
+| reset agnóstico pela lib (`:blindcheck-focus`) | `Tela 2` | `Tela 2` |
 | rótulos únicos + `paneTitle` (controle) | `Tela 2` | `Tela 2 → Tela 2` |
+| reset combinado legado (como o app entrega hoje) | `Ir para home` | `Tela 2 → Ir para home → Button → Double-tap to activate` |
 
 ### IDs de foco
 
@@ -143,6 +146,56 @@ cenário com IDs únicos teve exatamente o mesmo foco e a mesma sequência TTS d
 baseline. O ID é útil para automação; não é um mecanismo confiável para mudar a
 heurística de foco do leitor de tela.
 
+## Resultado 5 — reset agnóstico como biblioteca
+
+O protótipo imperativo dependia de infraestrutura na tela: uma classe base, um
+registro explícito do primeiro alvo e uma `AndroidView` nativa para que existisse
+uma `View` na qual chamar `performAccessibilityAction`. Isso resolvia o caso do
+experimento, mas não era aplicável a uma tela Compose comum e ainda introduzia
+uma variável a mais em relação ao baseline: a árvore do cenário imperativo não
+era a mesma do baseline.
+
+`:blindcheck-focus` reimplementa o contorno sem nada disso. A tela aplica
+`Modifier.resetAccessibilityFocusOnEnter(key = backStackEntry.id)` no seu
+container-raiz e não registra coisa alguma. O alvo é resolvido a partir da árvore
+semântica da própria subárvore do modifier — primeiro por `traversalIndex`,
+depois de cima para baixo e da esquerda para a direita — e recebe
+`ACTION_ACCESSIBILITY_FOCUS` num frame real do Compose, sem atraso fixo e sem
+evento sintético.
+
+O cenário `agnostic-focus-reset` mantém os rótulos ambíguos do baseline
+(`Continuar` nas três telas) e é Compose puro. Nas três execuções:
+
+```text
+TTS Tela 2
+FOCUS Tela 2
+```
+
+Ou seja: o mesmo resultado do foco imperativo, sem `AndroidView`, sem registro
+por tela e sem conhecimento do conteúdo.
+
+## Resultado 6 — a combinação que o app entrega não resolve o caso
+
+Até esta rodada a matriz media apenas as variáveis isoladas. O cenário marcado
+como solução no app — `legacy-combined-reset`, que combina semântica recriada,
+`paneTitle` e foco imperativo, e mantém o botão Home no topo — nunca tinha sido
+medido. Medido agora, nas três execuções:
+
+```text
+TTS Tela 2
+TTS Ir para home
+TTS Button
+TTS Double-tap to activate
+FOCUS Ir para home, Botão
+```
+
+O `paneTitle` comunica a troca de contexto, mas o foco é reiniciado no primeiro
+item visual — o botão Home, cujo rótulo é idêntico nas três telas. O reset
+acontece; a ambiguidade que originou a investigação, não. Isso reforça que o
+alvo do reset precisa ser o primeiro item **do conteúdo do destino**, e é
+exatamente o que a biblioteca isola: o chrome fora da subárvore do modifier
+nunca é escolhido.
+
 ## Deliberação
 
 Rótulos diferentes não são uma solução para este caso. Eles existem somente
@@ -151,19 +204,31 @@ identidade textual muda.
 
 IDs por página e `key(page)` não alteraram o comportamento do TalkBack. O
 `paneTitle` anunciou a mudança de contexto, mas manteve o foco em `Continuar`.
-O único experimento que colocou o foco no primeiro item e produziu uma única
-fala foi `ACTION_ACCESSIBILITY_FOCUS` aplicado ao título novo, sem enviar um
-segundo evento sintético.
+As duas abordagens que colocaram o foco no primeiro item e produziram uma única
+fala aplicam `ACTION_ACCESSIBILITY_FOCUS` ao nó novo, sem enviar um segundo
+evento sintético: o protótipo imperativo e a biblioteca agnóstica. Entre as
+duas, a biblioteca é a que pode ser adotada por uma tela Compose qualquer, e é
+a única que garante que o alvo vem da subárvore do próprio destino.
 
-Esse resultado torna o foco imperativo um candidato de contorno para o projeto,
-mas ainda não uma garantia geral: ele depende do timing entre Compose, a árvore
-Android e a versão do leitor de tela. A adoção deve ficar protegida por testes
-instrumentados e TTS spy, e ser validada em mais combinações de Android e
-TalkBack antes de virar comportamento padrão.
+Esse resultado torna o reset de foco um contorno viável para o projeto, mas
+ainda não uma garantia geral: ele depende do timing entre Compose, a árvore
+Android e a versão do leitor de tela. A adoção segue protegida por testes
+instrumentados e TTS spy, e precisa ser validada em mais combinações de Android
+e TalkBack antes de virar comportamento padrão.
 
 ## Regressão automatizada
 
-O runner versionado executa essa matriz com:
+Os testes instrumentados com TalkBack são opt-in e rodam com:
+
+```bash
+./gradlew :blindcheck-test-app:connectedDebugAndroidTest -PrunTalkBackFocusTests=true
+```
+
+O argumento é declarado pelo DSL do Android porque
+`-Pandroid.testInstrumentationRunnerArguments.*` é descartado com configuration
+cache, o que fazia esses testes serem silenciosamente pulados.
+
+O runner versionado executa a matriz com:
 
 ```bash
 NAVGRAPH_TTS_RUNS=3 make navgraph-tts-matrix
