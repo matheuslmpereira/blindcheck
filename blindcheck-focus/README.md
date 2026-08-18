@@ -71,6 +71,32 @@ cancelado junto com a composição.
 
 ---
 
+## Superfície de API e risco de atualização
+
+O módulo depende apenas do SDK do Android e do Compose. Não usa nenhuma API deprecada nem nenhuma
+que exija `@OptIn` experimental.
+
+| Origem | O que é usado |
+|---|---|
+| SDK Android | `Context`, `View`, `AccessibilityManager`, `AccessibilityNodeInfo` |
+| Compose runtime | `Composable`, `LaunchedEffect`, `remember`, `rememberSaveable`, `withFrameNanos` |
+| Compose ui | `Modifier`, `LocalView`, `onGloballyPositioned`, `semantics`, `SemanticsNode`, `SemanticsOwner`, `SemanticsProperties`, `SemanticsActions`, `SemanticsPropertyKey`, `RootForTest` |
+| JDK | `AtomicLong` |
+
+Duas decisões existem especificamente para reduzir risco de atualização:
+
+* a propriedade "oculto da acessibilidade" é lida **pelo nome** na configuração semântica, porque o
+  Compose renomeou `InvisibleToUser` para `HideFromAccessibility` e deprecou a primeira. As duas
+  grafias são reconhecidas, sem depender do símbolo;
+* o modifier é uma função `@Composable`, não `Modifier.composed`, que está em depreciação suave.
+
+O único ponto de acoplamento a observar num upgrade do Compose é `RootForTest`, usado para ler a
+árvore semântica a partir da `View` hospedeira. Não há caminho público alternativo hoje. O cast é
+seguro (`as?`): se uma versão futura deixar de expor o owner ali, **o reset simplesmente não roda e
+a tela mantém o comportamento padrão da plataforma** — sem crash e sem mudança de comportamento
+além da perda do reset. O teste instrumentado `exposesTheSemanticsOwnerOfTheHostView` existe para
+que esse cenário quebre o build, e não a produção.
+
 ## Limites conhecidos
 
 * O reset depende do momento em que o Compose publica a árvore semântica e da versão do leitor de

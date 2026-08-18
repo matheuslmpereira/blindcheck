@@ -11,12 +11,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.node.RootForTest
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getAllSemanticsNodes
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -25,6 +27,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -98,6 +101,40 @@ class AccessibilityFocusResetTest {
                 Button(onClick = {}) { Text("Continuar") }
                 Text("texto abaixo")
             },
+        )
+    }
+
+    @Test
+    @OptIn(ExperimentalComposeUiApi::class)
+    fun ignoresNodesTheScreenHidesFromAccessibility() {
+        // invisibleToUser() is the experimental spelling available in this Compose version; the
+        // library detects the property by name, so the renamed HideFromAccessibility works too.
+        assertEquals(
+            "item visível",
+            resolveInitialFocusText {
+                Text(
+                    text = "oculto do leitor",
+                    modifier = Modifier.semantics { invisibleToUser() },
+                )
+                Text("item visível")
+            },
+        )
+    }
+
+    @Test
+    fun exposesTheSemanticsOwnerOfTheHostView() {
+        // Guard for the library's single coupling point with compose-ui: if an upgrade stops
+        // exposing the semantics owner here, the reset silently stops working in production.
+        lateinit var hostView: View
+        composeRule.setContent {
+            hostView = LocalView.current
+            Text("conteúdo")
+        }
+        composeRule.waitForIdle()
+
+        assertTrue(
+            "LocalView must expose the semantics owner for the reset to resolve a target.",
+            hostView is RootForTest,
         )
     }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.View
 import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,9 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
@@ -44,6 +43,9 @@ private val resetRootIds = AtomicLong(0L)
  */
 private const val MAX_FRAME_ATTEMPTS = 30
 
+/** Names Compose has used for "this node is hidden from accessibility", oldest first. */
+private val HIDDEN_FROM_ACCESSIBILITY_PROPERTIES = setOf("InvisibleToUser", "HideFromAccessibility")
+
 /**
  * Moves screen-reader focus to the first accessible item of this subtree once, when [key] changes.
  *
@@ -61,10 +63,11 @@ private const val MAX_FRAME_ATTEMPTS = 30
  * value, so it never pulls focus back while the person navigates inside the destination.
  * @param enabled set to `false` to keep the platform default behaviour.
  */
+@Composable
 fun Modifier.resetAccessibilityFocusOnEnter(
     key: Any?,
     enabled: Boolean = true,
-): Modifier = composed {
+): Modifier {
     val view = LocalView.current
     val rootId = remember(key) { "blindcheck-focus-reset-${resetRootIds.incrementAndGet()}" }
     var hasSubtreeLayout by remember(key) { mutableStateOf(false) }
@@ -94,7 +97,7 @@ fun Modifier.resetAccessibilityFocusOnEnter(
         }
     }
 
-    this
+    return this
         .semantics { this[AccessibilityFocusResetRoot] = rootId }
         .onGloballyPositioned { hasSubtreeLayout = true }
 }
@@ -172,9 +175,24 @@ private fun SemanticsNode.isActionable(): Boolean =
         config.getOrNull(SemanticsActions.OnLongClick) != null ||
         config.getOrNull(SemanticsActions.SetText) != null
 
-@Suppress("DEPRECATION")
-@OptIn(ExperimentalComposeUiApi::class)
+/**
+ * Whether the screen marked this node as hidden from accessibility.
+ *
+ * The property is matched by name instead of by symbol on purpose. Compose renamed
+ * `InvisibleToUser` to `HideFromAccessibility` and deprecated the former, and the older symbol also
+ * required an experimental opt-in. Reading the configuration keeps this working across both names
+ * without depending on a deprecated or experimental API.
+ */
 private fun SemanticsNode.isHiddenFromAccessibility(): Boolean =
-    config.getOrNull(SemanticsProperties.InvisibleToUser) != null
+    config.any { (property, _) -> property.name in HIDDEN_FROM_ACCESSIBILITY_PROPERTIES }
 
+/**
+ * The only place where this library depends on the host view exposing the semantics tree.
+ *
+ * `RootForTest` is stable public API of `compose-ui`, but it is the single coupling point worth
+ * watching on a Compose upgrade. The cast is deliberately safe: if a future version stops exposing
+ * the owner here, the reset simply does not run and the screen keeps the platform default
+ * behaviour — no crash and no behaviour change beyond losing the reset. The instrumented tests
+ * assert the resolution, so an upgrade that breaks it fails the build instead of shipping.
+ */
 private fun View.semanticsOwnerOrNull(): SemanticsOwner? = (this as? RootForTest)?.semanticsOwner
