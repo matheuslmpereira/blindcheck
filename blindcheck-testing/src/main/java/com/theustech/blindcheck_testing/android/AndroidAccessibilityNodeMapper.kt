@@ -84,7 +84,10 @@ class AndroidAccessibilityNodeMapper(
     }
 
     companion object {
-        const val DEFAULT_MAX_DEPTH = 8
+        // A Compose screen that embeds Android views nests well beyond eight levels. With the
+        // previous limit the deep nodes were dropped and assertions reported an empty window
+        // instead of the content that was really there.
+        const val DEFAULT_MAX_DEPTH = 24
         const val DEFAULT_MAX_NODES = 250
     }
 }

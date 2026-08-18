@@ -16,6 +16,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Declared through the DSL because -Pandroid.testInstrumentationRunnerArguments.* is
+        // dropped when configuration caching is on, which silently skipped the opt-in tests.
+        testInstrumentationRunnerArguments["runTalkBackFocusTests"] =
+            providers.gradleProperty("runTalkBackFocusTests").getOrElse("false")
     }
 
     buildTypes {

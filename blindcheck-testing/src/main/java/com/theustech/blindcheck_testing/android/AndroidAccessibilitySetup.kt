@@ -108,7 +108,7 @@ class AndroidAccessibilitySetup(
     private fun shellQuote(value: String): String = "'${value.replace("'", "'\\\"'\\\"'")}'"
 
     private fun shell(command: String): String {
-        val pfd = instrumentation.uiAutomation.executeShellCommand(command)
+        val pfd = instrumentation.blindCheckUiAutomation().executeShellCommand(command)
         return pfd.use {
             // Drain the output so the command is guaranteed to complete before we continue.
             FileInputStream(it.fileDescriptor).use { stream -> stream.readBytes().decodeToString() }
@@ -120,7 +120,9 @@ class AndroidAccessibilitySetup(
         const val TALKBACK_PACKAGE_NAME = "com.google.android.marvin.talkback"
         const val TALKBACK_SERVICE_ID =
             "com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService"
-        private const val DEFAULT_TALKBACK_BIND_TIMEOUT_MS = 5_000L
+        // TalkBack is restarted by every instrumentation install, so a cold bind can take
+        // well over five seconds. A short timeout turned opt-in tests into silent skips.
+        private const val DEFAULT_TALKBACK_BIND_TIMEOUT_MS = 30_000L
         private const val TALKBACK_BIND_POLL_INTERVAL_MS = 100L
 
         fun create(): AndroidAccessibilitySetup =

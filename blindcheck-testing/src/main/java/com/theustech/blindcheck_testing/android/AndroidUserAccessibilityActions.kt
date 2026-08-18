@@ -33,7 +33,7 @@ class AndroidUserAccessibilityActions(
 
     // Text input has no natural touch equivalent — ACTION_SET_TEXT is the correct API.
     override suspend fun inputText(value: String) {
-        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return
+        val root = instrumentation.blindCheckUiAutomation().rootInActiveWindow ?: return
         val focused = root.useNode { node ->
             node.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
                 ?: node.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)

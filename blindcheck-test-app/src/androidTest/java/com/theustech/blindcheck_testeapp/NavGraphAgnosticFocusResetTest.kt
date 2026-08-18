@@ -1,15 +1,12 @@
 package com.theustech.blindcheck_testeapp
 
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import com.theustech.blindcheck_testing.android.AndroidAccessibilitySetup
 import com.theustech.blindcheck_testing.android.AndroidAccessibilityTestDriver
 import com.theustech.blindcheck_testing.assertions.FocusExpectation
 import org.junit.After
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 
 /**
@@ -19,14 +16,14 @@ import org.junit.Test
  * reset comes only from `Modifier.resetAccessibilityFocusOnEnter`, so this test fails if the
  * library stops resolving the first accessible item of the new destination.
  *
+ * Activation goes through the accessibility node, because an injected tap is swallowed by
+ * TalkBack's touch exploration. One transition is asserted here; the full three-destination sweep
+ * driven by real TalkBack gestures is covered by the controlled TTS matrix.
+ *
  * Run only on a dedicated emulator that has TalkBack installed:
- * ./gradlew :blindcheck-test-app:connectedDebugAndroidTest
- *   -Pandroid.testInstrumentationRunnerArguments.runTalkBackFocusTests=true
+ * ./gradlew :blindcheck-test-app:connectedDebugAndroidTest -PrunTalkBackFocusTests=true
  */
 class NavGraphAgnosticFocusResetTest {
-
-    @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
 
     private val setup = AndroidAccessibilitySetup.create()
     private val driver = AndroidAccessibilityTestDriver.create(synchronizeWithUiIdle = false)
@@ -35,14 +32,16 @@ class NavGraphAgnosticFocusResetTest {
     @Before
     fun enableTalkBackForOptInTest() {
         assumeTrue(
-            "Pass -e ${AndroidAccessibilitySetup.TALKBACK_FOCUS_TEST_ARGUMENT} true to run TalkBack focus tests.",
+            "Pass -PrunTalkBackFocusTests=true to run TalkBack focus tests.",
             setup.isTalkBackFocusTestEnabled(),
         )
         assumeTrue("TalkBack must be installed on the dedicated test emulator.", setup.isTalkBackInstalled())
 
         settingsSnapshot = setup.captureAccessibilitySettings()
         setup.enableTalkBack()
-        assumeTrue("TalkBack did not bind within the test setup timeout.", setup.waitForTalkBackService())
+        // Once the run is explicitly opted in, a TalkBack that never binds is a failure:
+        // skipping here would report green without ever exercising the reset.
+        assertTrue("TalkBack did not bind within the test setup timeout.", setup.waitForTalkBackService())
     }
 
     @After
@@ -52,23 +51,14 @@ class NavGraphAgnosticFocusResetTest {
 
     @Test
     fun libraryResetMovesFocusToTheFirstAccessibleItemOfEachDestination() {
-        composeRule.activityRule.scenario.onActivity { activity ->
-            activity.intent.putExtra(
-                EXTRA_NAVGRAPH_ACCESSIBILITY_APPROACH,
-                NavGraphAccessibilityApproach.AgnosticFocusReset.argumentValue,
-            )
-            activity.recreate()
+        launchNavGraphApproach(NavGraphAccessibilityApproach.AgnosticFocusReset).use {
+            driver.assertCurrentWindowContains(FocusExpectation(textEquals = "Tela 1"))
+            driver.assertFocused(FocusExpectation(textEquals = "Tela 1"))
+
+            activateWithAccessibilityFocus("Continuar")
+
+            driver.assertCurrentWindowContains(FocusExpectation(textEquals = "Tela 2"))
+            driver.assertFocused(FocusExpectation(textEquals = "Tela 2"))
         }
-        driver.assertCurrentWindowContains(FocusExpectation(textEquals = "Tela 1"))
-
-        composeRule.onNodeWithText("Continuar").performClick()
-
-        driver.assertCurrentWindowContains(FocusExpectation(textEquals = "Tela 2"))
-        driver.assertFocused(FocusExpectation(textEquals = "Tela 2"))
-
-        composeRule.onNodeWithText("Continuar").performClick()
-
-        driver.assertCurrentWindowContains(FocusExpectation(textEquals = "Tela 3"))
-        driver.assertFocused(FocusExpectation(textEquals = "Tela 3"))
     }
 }

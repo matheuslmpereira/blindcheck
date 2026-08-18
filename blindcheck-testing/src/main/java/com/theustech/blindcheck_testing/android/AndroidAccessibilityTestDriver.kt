@@ -15,7 +15,7 @@ class AndroidAccessibilityTestDriver(
     private val synchronizeWithUiIdle: Boolean = true,
 ) {
     fun currentWindowSnapshot(): A11yNodeSnapshot {
-        val root = instrumentation.uiAutomation.rootInActiveWindow
+        val root = instrumentation.blindCheckUiAutomation().rootInActiveWindow
             ?: throw AssertionError("Expected an active accessibility window, but rootInActiveWindow was null.")
 
         return root.useNode {
@@ -92,8 +92,27 @@ class AndroidAccessibilityTestDriver(
         }
     }
 
+    /**
+     * Non-throwing counterpart of [assertFocused], for tests that need to drive focus with the user
+     * contract until a node is reached. It reads every window, because with TalkBack bound the
+     * active window can briefly be the screen reader's own overlay.
+     */
+    fun isFocused(expectation: FocusExpectation): Boolean =
+        currentWindowSnapshots()
+            .flatMap { it.flattenPreOrder() }
+            .filter { it.focused }
+            .any { node -> expectation.matchesNodeOrActionableParent(node) }
+
+    /** Labels of the currently focused nodes, for failure messages. */
+    fun focusedLabels(): List<String> =
+        currentWindowSnapshots()
+            .flatMap { it.flattenPreOrder() }
+            .filter { it.focused }
+            .mapNotNull { it.text ?: it.contentDescription }
+            .distinct()
+
     fun focusFirst(expectation: FocusExpectation): Boolean {
-        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return false
+        val root = instrumentation.blindCheckUiAutomation().rootInActiveWindow ?: return false
         return root.useNode { node ->
             node.findFirstMatching(expectation)?.useNode { match ->
                 match.performAction(AccessibilityNodeInfo.ACTION_FOCUS) or
@@ -109,7 +128,7 @@ class AndroidAccessibilityTestDriver(
      * instrumented tests that need to establish the same focus type observed by screen readers.
      */
     fun focusFirstForAccessibility(expectation: FocusExpectation): Boolean {
-        val root = instrumentation.uiAutomation.rootInActiveWindow ?: return false
+        val root = instrumentation.blindCheckUiAutomation().rootInActiveWindow ?: return false
         return root.useNode { node ->
             node.findFirstMatching(expectation)?.useNode { match ->
                 match.performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS)
@@ -179,7 +198,7 @@ class AndroidAccessibilityTestDriver(
         if (synchronizeWithUiIdle) {
             instrumentation.waitForIdleSync()
         }
-        val uiAutomation = instrumentation.uiAutomation
+        val uiAutomation = instrumentation.blindCheckUiAutomation()
         val roots = buildList {
             // On a device with TalkBack enabled, UiAutomation.windows can temporarily omit
             // the active application window while the service is reacting to a window change.
