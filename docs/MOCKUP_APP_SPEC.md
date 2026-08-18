@@ -55,9 +55,18 @@ regression comparisons.
 The original and labeled comparison scenarios display a top app bar with an accessible
 home icon labeled `Ir para home`. Activating it returns to the scenario selection screen.
 
-On the selection screen, the only navigation shortcut shown by default is
-`Iniciar solução NavGraph com foco acessível`. It launches the lifecycle-driven
-`ImperativeFocus` implementation. All baseline, labeled, color, legacy, and
+On the selection screen, the only navigation shortcuts shown by default are the
+focus-reset comparison pair:
+
+* `Comparação: foco imperativo (método inicial)` launches the lifecycle-driven
+  `ImperativeFocus` implementation, where the screen registers its own first
+  native accessible target;
+* `Comparação: reset agnóstico pela lib` launches `AgnosticFocusReset`, where the
+  destination root applies `Modifier.resetAccessibilityFocusOnEnter` and
+  registers nothing.
+
+Both keep the ambiguous `Continuar` label on every destination, so the only
+variable between them is how the reset target is chosen. All baseline, labeled, legacy, and
 isolated comparison scenarios are retained under the collapsed
 `Mostrar casos de teste de navegação` control, so they remain available for
 regression investigation without competing with the recommended path.

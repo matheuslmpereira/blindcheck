@@ -338,11 +338,24 @@ fun LoginScreen(
             Text("Entrar")
         }
 
+        Text(
+            text = "Comparação de reset de foco",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+
         Button(
             modifier = Modifier.fillMaxWidth(),
             onClick = { onStartNavGraphApproach(NavGraphAccessibilityApproach.ImperativeFocus) },
         ) {
-            Text("Iniciar solução NavGraph com foco acessível")
+            Text("Comparação: foco imperativo (método inicial)")
+        }
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onStartNavGraphApproach(NavGraphAccessibilityApproach.AgnosticFocusReset) },
+        ) {
+            Text("Comparação: reset agnóstico pela lib")
         }
 
         TextButton(

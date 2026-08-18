@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import org.junit.Rule
 import org.junit.Test
@@ -42,8 +43,9 @@ class BlindCheckMockupAppTest {
     }
 
     @Test
-    fun navigationTestsAreCollapsedAndTheDefinitiveSolutionIsAvailableImmediately() {
-        composeRule.onNodeWithText("Iniciar solução NavGraph com foco acessível").assertIsDisplayed()
+    fun navigationTestsAreCollapsedAndTheComparisonPairIsAvailableImmediately() {
+        composeRule.onNodeWithText("Comparação: foco imperativo (método inicial)").assertIsDisplayed()
+        composeRule.onNodeWithText("Comparação: reset agnóstico pela lib").assertIsDisplayed()
         composeRule.onAllNodesWithText("Iniciar navegação por recomposição").assertCountEquals(0)
 
         openNavigationTestCases()
@@ -55,8 +57,8 @@ class BlindCheckMockupAppTest {
     }
 
     @Test
-    fun definitiveNavGraphSolution_startsWithoutOpeningTheTestCases() {
-        composeRule.onNodeWithText("Iniciar solução NavGraph com foco acessível").performClick()
+    fun comparisonScenarios_startWithoutOpeningTheTestCases() {
+        composeRule.onNodeWithText("Comparação: foco imperativo (método inicial)").performClick()
 
         composeRule.onNodeWithText("Continuar").assertIsDisplayed()
         composeRule.onAllNodesWithContentDescription("Ir para home").assertCountEquals(0)
@@ -76,7 +78,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun threeScreenScenario_continueNavigatesThroughAllScreens() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação por recomposição").performClick()
+        composeRule.onNodeWithText("Iniciar navegação por recomposição").performScrollTo().performClick()
 
         composeRule.onNodeWithText("Tela 1").assertIsDisplayed()
         composeRule.onNodeWithText("Continuar").performClick()
@@ -88,7 +90,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun threeScreenScenario_lastContinue_restartsAtFirstScreen() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação por recomposição").performClick()
+        composeRule.onNodeWithText("Iniciar navegação por recomposição").performScrollTo().performClick()
         repeat(2) { composeRule.onNodeWithText("Continuar").performClick() }
 
         composeRule.onNodeWithText("Tela 3").assertIsDisplayed()
@@ -99,7 +101,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun navGraphScenario_continueNavigatesThroughAllScreens() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação por NavGraph").performClick()
+        composeRule.onNodeWithText("Iniciar navegação por NavGraph").performScrollTo().performClick()
 
         composeRule.onNodeWithText("Tela 1").assertIsDisplayed()
         composeRule.onNodeWithText("Continuar").performClick()
@@ -111,7 +113,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun labeledStateScenario_usesPageNumberedContinueButtons() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação numerada por recomposição").performClick()
+        composeRule.onNodeWithText("Iniciar navegação numerada por recomposição").performScrollTo().performClick()
 
         composeRule.onNodeWithText("Tela 1").assertIsDisplayed()
         composeRule.onNodeWithText("continuar 1").performClick()
@@ -124,7 +126,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun labeledNavGraphScenario_usesPageNumberedContinueButtons() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação numerada por NavGraph").performClick()
+        composeRule.onNodeWithText("Iniciar navegação numerada por NavGraph").performScrollTo().performClick()
 
         composeRule.onNodeWithText("Tela 1").assertIsDisplayed()
         composeRule.onNodeWithText("continuar 1").performClick()
@@ -137,7 +139,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun colorStateScenario_usesRedBlueGreenButtons() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação por cores (recomposição)").performClick()
+        composeRule.onNodeWithText("Iniciar navegação por cores (recomposição)").performScrollTo().performClick()
 
         composeRule.onNodeWithText("Tela 1").assertIsDisplayed()
         composeRule.onNodeWithText("red").performClick()
@@ -150,7 +152,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun colorNavGraphScenario_usesRedBlueGreenButtons() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação por cores (NavGraph)").performClick()
+        composeRule.onNodeWithText("Iniciar navegação por cores (NavGraph)").performScrollTo().performClick()
 
         composeRule.onNodeWithText("Tela 1").assertIsDisplayed()
         composeRule.onNodeWithText("red").performClick()
@@ -163,7 +165,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun recompositionScenario_homeIcon_returnsToScenarioSelection() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação por recomposição").performClick()
+        composeRule.onNodeWithText("Iniciar navegação por recomposição").performScrollTo().performClick()
 
         composeRule.onNodeWithContentDescription("Ir para home").performClick()
 
@@ -174,7 +176,7 @@ class BlindCheckMockupAppTest {
     @Test
     fun navGraphScenario_homeIcon_returnsToScenarioSelection() {
         openNavigationTestCases()
-        composeRule.onNodeWithText("Iniciar navegação por NavGraph").performClick()
+        composeRule.onNodeWithText("Iniciar navegação por NavGraph").performScrollTo().performClick()
 
         composeRule.onNodeWithContentDescription("Ir para home").performClick()
 
