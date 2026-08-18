@@ -106,13 +106,15 @@ private fun Context.isAccessibilityEnabled(): Boolean {
 
 /**
  * Resolves the first focusable node of the subtree tagged with [rootId], or `null` while the
- * subtree is not published yet.
+ * subtree is not published yet. A `null` [rootId] resolves the first reset root in the tree, which
+ * is how tests inspect the resolution without reaching into the generated identifier.
  */
-internal fun View.findInitialAccessibilityFocusTarget(rootId: String): Int? {
+internal fun View.findInitialAccessibilityFocusTarget(rootId: String? = null): Int? {
     val owner = semanticsOwnerOrNull() ?: return null
     val unmergedNodes = owner.getAllSemanticsNodes(mergingEnabled = false)
-    val resetRoot = unmergedNodes.firstOrNull {
-        it.config.getOrNull(AccessibilityFocusResetRoot) == rootId
+    val resetRoot = unmergedNodes.firstOrNull { node ->
+        val nodeRootId = node.config.getOrNull(AccessibilityFocusResetRoot)
+        nodeRootId != null && (rootId == null || nodeRootId == rootId)
     } ?: return null
 
     val subtreeNodeIds = resetRoot.collectSubtreeNodeIds()

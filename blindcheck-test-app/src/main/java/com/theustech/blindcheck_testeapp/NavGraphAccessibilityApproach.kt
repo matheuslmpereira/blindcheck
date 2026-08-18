@@ -9,6 +9,7 @@ enum class NavGraphAccessibilityApproach(
     val announcesPaneTitle: Boolean = false,
     val requestsImperativeAccessibilityFocus: Boolean = false,
     val usesLibraryFocusReset: Boolean = false,
+    val rendersHomeAction: Boolean = false,
     val isExperiment: Boolean = true,
     val isolatesSingleVariable: Boolean = true,
 ) {
@@ -59,6 +60,7 @@ enum class NavGraphAccessibilityApproach(
         recreatesDestinationSemantics = true,
         announcesPaneTitle = true,
         requestsImperativeAccessibilityFocus = true,
+        rendersHomeAction = true,
         isExperiment = false,
         isolatesSingleVariable = false,
     ),

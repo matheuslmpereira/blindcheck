@@ -82,6 +82,12 @@ class NavGraphAccessibilityApproachTest {
         assertTrue(legacy.recreatesDestinationSemantics)
         assertTrue(legacy.announcesPaneTitle)
         assertTrue(legacy.requestsImperativeAccessibilityFocus)
+        // The shipped scenario keeps the home action, so its reset target is the home button,
+        // which carries the same label on every destination. The matrix must measure that.
+        assertTrue(legacy.rendersHomeAction)
+        NavGraphAccessibilityApproach.experiments.forEach { experiment ->
+            assertFalse("$experiment must isolate the destination content", experiment.rendersHomeAction)
+        }
         assertFalse(NavGraphAccessibilityApproach.experiments.contains(legacy))
     }
 }

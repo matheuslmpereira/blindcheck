@@ -247,7 +247,7 @@ fun BlindCheckMockupApp(
                 modifier = Modifier.padding(innerPadding),
                 onHome = { screen = MockupScreen.Login },
                 accessibilityApproach = currentScreen.approach,
-                showHomeAction = false,
+                showHomeAction = currentScreen.approach.rendersHomeAction,
             )
         }
     }

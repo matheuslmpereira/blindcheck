@@ -19,7 +19,9 @@ APPROACHES=(
   recreated-semantics
   pane-title
   imperative-focus
+  agnostic-focus-reset
   unique-labels-pane-title
+  legacy-combined-reset
 )
 
 die() {

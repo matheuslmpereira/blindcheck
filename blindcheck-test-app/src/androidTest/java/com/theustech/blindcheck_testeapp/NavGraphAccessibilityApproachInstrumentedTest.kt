@@ -87,6 +87,18 @@ class NavGraphAccessibilityApproachInstrumentedTest {
         }
     }
 
+    @Test
+    fun agnosticFocusResetApproachKeepsPlainComposeContentAndAmbiguousLabels() {
+        launch(NavGraphAccessibilityApproach.AgnosticFocusReset).use {
+            // No AndroidView, no per-screen registration: every node stays a Compose semantics node.
+            composeRule.onNodeWithText("Tela 1").assertIsDisplayed()
+            composeRule.onNodeWithText("Continuar").performClick()
+
+            composeRule.onNodeWithText("Tela 2").assertIsDisplayed()
+            composeRule.onNodeWithText("Continuar").assertIsDisplayed()
+        }
+    }
+
     private fun launch(
         approach: NavGraphAccessibilityApproach,
     ): ActivityScenario<MainActivity> {
