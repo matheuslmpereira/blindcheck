@@ -30,24 +30,10 @@ abstract class Screen {
 
     @Composable
     final fun Render(backStackEntry: NavBackStackEntry) {
-        var isResumed by remember(backStackEntry.id) {
-            mutableStateOf(
-                backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
-            )
-        }
+        val isResumed = rememberIsDestinationShowing(backStackEntry)
         var hasRootLayout by remember(backStackEntry.id) { mutableStateOf(false) }
         var initialAccessibilityTarget by remember(backStackEntry.id) { mutableStateOf<View?>(null) }
         var hasRequestedAccessibilityFocus by remember(backStackEntry.id) { mutableStateOf(false) }
-
-        DisposableEffect(backStackEntry) {
-            val observer = LifecycleEventObserver { _, _ ->
-                isResumed = backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-            }
-            backStackEntry.lifecycle.addObserver(observer)
-            onDispose {
-                backStackEntry.lifecycle.removeObserver(observer)
-            }
-        }
 
         Content(
             modifier = Modifier.onGloballyPositioned {
@@ -97,6 +83,33 @@ abstract class Screen {
         modifier: Modifier,
         registerInitialAccessibilityTarget: (View) -> Unit,
     )
+}
+
+/**
+ * Whether this destination is the one currently being shown.
+ *
+ * `RESUMED` is the boundary Navigation Compose uses: while a transition runs, the destination
+ * being left drops to `STARTED` and stays composed alongside the one arriving. That edge is what
+ * both accessibility strategies key off — one to avoid pulling focus into content on its way out,
+ * the other to retire that content from the accessibility tree while it is still on screen.
+ */
+@Composable
+internal fun rememberIsDestinationShowing(backStackEntry: NavBackStackEntry): Boolean {
+    var isShowing by remember(backStackEntry.id) {
+        mutableStateOf(backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+
+    DisposableEffect(backStackEntry) {
+        val observer = LifecycleEventObserver { _, _ ->
+            isShowing = backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        }
+        backStackEntry.lifecycle.addObserver(observer)
+        onDispose {
+            backStackEntry.lifecycle.removeObserver(observer)
+        }
+    }
+
+    return isShowing
 }
 
 internal fun shouldRequestInitialAccessibilityFocus(

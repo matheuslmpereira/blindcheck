@@ -54,13 +54,29 @@ class HomeFocusResetComparisonTest {
     }
 
     @Test
-    fun bothComparisonsUseTheSameAmbiguousLabel() {
+    fun retireComparison_keepsTheArrivingDestinationReadable() {
+        composeRule.onNodeWithText(RETIRE_ENTRY).performClick()
+
+        composeRule.onNodeWithText("Tela 1").assertIsDisplayed()
+
+        composeRule.onNodeWithText("Continuar").performClick()
+
+        // Retiring the wrong subtree would strip the semantics of the destination that arrives,
+        // and these queries read the semantics tree, so they are exactly what would go missing.
+        composeRule.onNodeWithText("Tela 2").assertIsDisplayed()
+        composeRule.onNodeWithText("Continuar").assertIsDisplayed()
+    }
+
+    @Test
+    fun everyComparisonUsesTheSameAmbiguousLabel() {
         composeRule.onNodeWithText(IMPERATIVE_ENTRY).assertIsDisplayed()
         composeRule.onNodeWithText(LIBRARY_ENTRY).assertIsDisplayed()
+        composeRule.onNodeWithText(RETIRE_ENTRY).assertIsDisplayed()
 
         listOf(
             NavGraphAccessibilityApproach.ImperativeFocus,
             NavGraphAccessibilityApproach.AgnosticFocusReset,
+            NavGraphAccessibilityApproach.RetireLeavingScreen,
         ).forEach { approach ->
             (1..3).forEach { page ->
                 assert(approach.continueLabel(page) == "Continuar") {
@@ -73,3 +89,4 @@ class HomeFocusResetComparisonTest {
 
 private const val IMPERATIVE_ENTRY = "Comparação: foco imperativo (método inicial)"
 private const val LIBRARY_ENTRY = "Comparação: reset agnóstico pela lib"
+private const val RETIRE_ENTRY = "Comparação: aposentar a tela que sai"

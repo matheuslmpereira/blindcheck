@@ -20,6 +20,7 @@ APPROACHES=(
   pane-title
   imperative-focus
   agnostic-focus-reset
+  retire-leaving-screen
   unique-labels-pane-title
   legacy-combined-reset
 )

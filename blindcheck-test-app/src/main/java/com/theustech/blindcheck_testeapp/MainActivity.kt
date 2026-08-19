@@ -68,6 +68,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavBackStackEntry
+import com.theustech.blindcheck_focus.AccessibilityFocusResetStrategy
 import com.theustech.blindcheck_focus.resetAccessibilityFocusOnEnter
 import com.theustech.blindcheck_testeapp.ui.theme.BlindchecktesteappTheme
 
@@ -358,6 +359,13 @@ fun LoginScreen(
             Text("Comparação: reset agnóstico pela lib")
         }
 
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onStartNavGraphApproach(NavGraphAccessibilityApproach.RetireLeavingScreen) },
+        ) {
+            Text("Comparação: aposentar a tela que sai")
+        }
+
         TextButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = { navigationTestCasesExpanded = !navigationTestCasesExpanded },
@@ -563,6 +571,28 @@ private fun NavGraphScenarioDestination(
         // first accessible item from the semantics tree of this subtree alone.
         NavGraphScenarioContent(
             modifier = Modifier.resetAccessibilityFocusOnEnter(key = backStackEntry.id),
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+            registerInitialAccessibilityTarget = {},
+        )
+        return
+    }
+
+    if (accessibilityApproach.retiresLeavingScreen) {
+        // Nothing here asks for focus. The destination on its way out clears the focus it holds
+        // and drops itself from the accessibility tree, so the only accessible content left is the
+        // one arriving — and where the reader lands is the platform's answer, which is exactly
+        // what this scenario measures.
+        NavGraphScenarioContent(
+            modifier = Modifier.resetAccessibilityFocusOnEnter(
+                key = backStackEntry.id,
+                strategy = AccessibilityFocusResetStrategy.RetireLeavingContent,
+                isShowing = rememberIsDestinationShowing(backStackEntry),
+            ),
             page = page,
             onContinue = onContinue,
             onHome = onHome,

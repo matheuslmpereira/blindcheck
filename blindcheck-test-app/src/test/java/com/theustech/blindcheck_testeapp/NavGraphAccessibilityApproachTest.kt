@@ -12,13 +12,14 @@ class NavGraphAccessibilityApproachTest {
     fun `experiments change exactly one accessibility variable from baseline`() {
         val strategies = NavGraphAccessibilityApproach.experiments.associateBy { it.argumentValue }
 
-        assertEquals(8, strategies.size)
+        assertEquals(9, strategies.size)
         assertTrue(strategies.getValue("unique-labels").usesUniqueLabels)
         assertTrue(strategies.getValue("unique-node-ids").exposesUniqueNodeIds)
         assertTrue(strategies.getValue("recreated-semantics").recreatesDestinationSemantics)
         assertTrue(strategies.getValue("pane-title").announcesPaneTitle)
         assertTrue(strategies.getValue("imperative-focus").requestsImperativeAccessibilityFocus)
         assertTrue(strategies.getValue("agnostic-focus-reset").usesLibraryFocusReset)
+        assertTrue(strategies.getValue("retire-leaving-screen").retiresLeavingScreen)
         assertTrue(strategies.getValue("unique-labels-pane-title").usesUniqueLabels)
         assertTrue(strategies.getValue("unique-labels-pane-title").announcesPaneTitle)
 
@@ -33,6 +34,7 @@ class NavGraphAccessibilityApproachTest {
                 strategy.announcesPaneTitle,
                 strategy.requestsImperativeAccessibilityFocus,
                 strategy.usesLibraryFocusReset,
+                strategy.retiresLeavingScreen,
             ).count { it }
             assertEquals("$name must isolate one variable", 1, enabledVariables)
             }
@@ -72,6 +74,25 @@ class NavGraphAccessibilityApproachTest {
             assertEquals(baseline.continueLabel(page), agnostic.continueLabel(page))
         }
         assertNull(agnostic.continueNodeId(1))
+    }
+
+    @Test
+    fun `retiring the leaving screen asks nothing of the arriving one`() {
+        val retire = NavGraphAccessibilityApproach.RetireLeavingScreen
+        val baseline = NavGraphAccessibilityApproach.Baseline
+
+        assertTrue(retire.retiresLeavingScreen)
+        // The whole premise is that no one requests focus: if this scenario also moved focus, it
+        // would measure the reset it is supposed to be an alternative to.
+        assertFalse(retire.requestsImperativeAccessibilityFocus)
+        assertFalse(retire.usesLibraryFocusReset)
+        assertFalse(retire.usesUniqueLabels)
+        assertFalse(retire.announcesPaneTitle)
+        assertTrue(retire.isExperiment)
+        (1..3).forEach { page ->
+            assertEquals(baseline.continueLabel(page), retire.continueLabel(page))
+        }
+        assertNull(retire.continueNodeId(1))
     }
 
     @Test

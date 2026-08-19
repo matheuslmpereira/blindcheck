@@ -9,6 +9,7 @@ enum class NavGraphAccessibilityApproach(
     val announcesPaneTitle: Boolean = false,
     val requestsImperativeAccessibilityFocus: Boolean = false,
     val usesLibraryFocusReset: Boolean = false,
+    val retiresLeavingScreen: Boolean = false,
     val rendersHomeAction: Boolean = false,
     val isExperiment: Boolean = true,
     val isolatesSingleVariable: Boolean = true,
@@ -46,6 +47,11 @@ enum class NavGraphAccessibilityApproach(
         argumentValue = "agnostic-focus-reset",
         scenarioLabel = "Experimento NavGraph: reset agnóstico pela lib",
         usesLibraryFocusReset = true,
+    ),
+    RetireLeavingScreen(
+        argumentValue = "retire-leaving-screen",
+        scenarioLabel = "Experimento NavGraph: aposentar a tela que sai",
+        retiresLeavingScreen = true,
     ),
     UniqueLabelsWithPaneTitle(
         argumentValue = "unique-labels-pane-title",
