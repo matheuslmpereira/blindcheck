@@ -56,17 +56,21 @@ The original and labeled comparison scenarios display a top app bar with an acce
 home icon labeled `Ir para home`. Activating it returns to the scenario selection screen.
 
 On the selection screen, the only navigation shortcuts shown by default are the
-focus-reset comparison pair:
+focus-reset comparison scenarios:
 
 * `Comparação: foco imperativo (método inicial)` launches the lifecycle-driven
   `ImperativeFocus` implementation, where the screen registers its own first
   native accessible target;
 * `Comparação: reset agnóstico pela lib` launches `AgnosticFocusReset`, where the
   destination root applies `Modifier.resetAccessibilityFocusOnEnter` and
-  registers nothing.
+  registers nothing;
+* `Comparação: aposentar a tela que sai` launches `RetireLeavingScreen`, where
+  nothing requests focus at all: the destination on its way out clears its
+  accessibility focus and drops its subtree from the accessibility tree, and
+  where the reader lands is the platform's answer.
 
-Both keep the ambiguous `Continuar` label on every destination, so the only
-variable between them is how the reset target is chosen. All baseline, labeled, legacy, and
+All three keep the ambiguous `Continuar` label on every destination, so the only
+variable between them is what happens to the focus. All baseline, labeled, legacy, and
 isolated comparison scenarios are retained under the collapsed
 `Mostrar casos de teste de navegação` control, so they remain available for
 regression investigation without competing with the recommended path.
@@ -82,7 +86,8 @@ changes one accessibility variable from the baseline:
 * `Experimento NavGraph: semântica recriada`;
 * `Experimento NavGraph: título de painel`;
 * `Experimento NavGraph: foco imperativo`;
-* `Experimento NavGraph: reset agnóstico pela lib`.
+* `Experimento NavGraph: reset agnóstico pela lib`;
+* `Experimento NavGraph: aposentar a tela que sai`.
 
 The final `Experimento NavGraph: rótulos únicos + título de painel` scenario
 is retained as an experimental control. Different button labels are not an

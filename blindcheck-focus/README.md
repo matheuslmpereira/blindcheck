@@ -124,7 +124,7 @@ que exija `@OptIn` experimental.
 |---|---|
 | SDK Android | `Context`, `View`, `AccessibilityManager`, `AccessibilityNodeInfo` |
 | Compose runtime | `Composable`, `LaunchedEffect`, `remember`, `rememberSaveable`, `withFrameNanos` |
-| Compose ui | `Modifier`, `LocalView`, `onGloballyPositioned`, `semantics`, `SemanticsNode`, `SemanticsOwner`, `SemanticsProperties`, `SemanticsActions`, `SemanticsPropertyKey`, `RootForTest` |
+| Compose ui | `Modifier`, `LocalView`, `onGloballyPositioned`, `semantics`, `SemanticsNode`, `SemanticsOwner`, `SemanticsProperties`, `SemanticsActions`, `SemanticsPropertyKey`, `clearAndSetSemantics`, `RootForTest` |
 | JDK | `AtomicLong` |
 
 Duas decisões existem especificamente para reduzir risco de atualização:
