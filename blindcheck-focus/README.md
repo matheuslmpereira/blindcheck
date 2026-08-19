@@ -47,6 +47,50 @@ puxar o foco de volta enquanto a pessoa navega dentro do destino.
 |---|---|
 | `key` | Rearma o reset quando muda; um reset por valor |
 | `enabled` | `false` mantém o comportamento padrão da plataforma |
+| `strategy` | Qual das duas abordagens medidas aplicar (abaixo) |
+| `isShowing` | `false` enquanto o destino está saindo |
+
+---
+
+## As duas estratégias
+
+O módulo expõe **um** modifier com duas estratégias, e não dois modifiers: são
+alternativas para medir uma contra a outra, não dois conceitos que a tela
+precise aprender.
+
+### `MoveFocusToFirstItem` (padrão)
+
+O conteúdo que chega toma o foco: o primeiro item acessível da subárvore recebe
+`ACTION_ACCESSIBILITY_FOCUS`. É a estratégia validada pela captura controlada de
+TTS, e a única que já tem resultado medido.
+
+### `RetireLeavingContent`
+
+O conteúdo que sai é que se retira: o foco de acessibilidade dentro da subárvore
+é liberado e a subárvore inteira é publicada como um nó sem propriedade alguma —
+inelegível para o leitor. **Ninguém pede foco.** A premissa é que o leitor mantém
+o foco em um nó equivalente apenas enquanto esse nó existe.
+
+A ordem importa: o foco é liberado enquanto os nós que o seguram ainda existem.
+Descartar a subárvore antes deixaria o leitor segurando um nó que não responde.
+
+Como isso acontece na saída, o host precisa dizer quando o conteúdo deixa de ser
+o atual — é para isso que serve `isShowing`. Em Navigation Compose, é o
+`NavBackStackEntry` caindo abaixo de `RESUMED`, o que acontece enquanto os dois
+destinos ainda estão compostos.
+
+```kotlin
+Modifier.resetAccessibilityFocusOnEnter(
+    key = backStackEntry.id,
+    strategy = AccessibilityFocusResetStrategy.RetireLeavingContent,
+    isShowing = backStackEntry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
+)
+```
+
+**Esta estratégia ainda não foi medida com leitor de tela real.** O resultado
+esperado, e os três desfechos possíveis, estão em
+[docs/ANDROID_NAVGRAPH_TALKBACK_FOCUS_TTS_SPY.md](../docs/ANDROID_NAVGRAPH_TALKBACK_FOCUS_TTS_SPY.md#resultado-7--aposentar-a-tela-que-sai-implementado-ainda-não-medido).
+Até lá, o padrão continua sendo `MoveFocusToFirstItem`.
 
 ---
 
@@ -103,7 +147,17 @@ que esse cenário quebre o build, e não a produção.
   tela; a validação de fidelidade é o TTS spy, não o `UiAutomation`.
 * Se a subárvore não expuser nenhum item acessível dentro de 30 frames, o reset desiste em silêncio
   e o comportamento padrão da plataforma permanece.
-* O reset só roda com acessibilidade ativa no dispositivo.
+* O reset só roda com acessibilidade ativa no dispositivo. Isso vale também para
+  a aposentadoria da subárvore: sem leitor de tela ativo, nada é removido da
+  árvore de acessibilidade.
+* `RetireLeavingContent` remove a subárvore com `clearAndSetSemantics`, porque na
+  versão do Compose usada aqui a propriedade "oculto da acessibilidade" existe
+  apenas como `invisibleToUser`, experimental e desde então renomeada. O efeito
+  observável para um leitor é o mesmo; a API é estável.
+* O modo de falha perigoso de `RetireLeavingContent` é aposentar o lado errado da
+  transição: a tela renderiza normalmente e fica invisível para o leitor. Os
+  testes instrumentados afirmam que o destino que chega continua legível
+  justamente por isso.
 
 ---
 
@@ -117,5 +171,10 @@ que esse cenário quebre o build, e não a produção.
 ./gradlew :blindcheck-focus:connectedDebugAndroidTest
 ```
 
-Os testes de unidade cobrem a escolha do alvo e o gate do reset; os instrumentados cobrem a
-resolução na árvore semântica real, inclusive a troca de `key` e o isolamento da subárvore.
+Os testes de unidade cobrem a escolha do alvo e os dois gates — reset e aposentadoria; os
+instrumentados cobrem a resolução na árvore semântica real, inclusive a troca de `key` e o
+isolamento da subárvore.
+
+A aposentadoria depende de acessibilidade ativa, que os testes instrumentados deste módulo não
+ligam. Ela é coberta onde há leitor de tela de verdade: `NavGraphRetireLeavingScreenTest` no app de
+teste, opt-in por `-PrunTalkBackFocusTests=true`, e a matriz de TTS.

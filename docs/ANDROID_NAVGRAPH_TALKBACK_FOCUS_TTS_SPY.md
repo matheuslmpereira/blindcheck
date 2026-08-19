@@ -131,6 +131,7 @@ e produziram a mesma sequência em todas as repetições:
 | `paneTitle` | `Continuar` | `Tela 2 → Continuar → Button → Double-tap to activate` |
 | foco imperativo somente com `ACTION_ACCESSIBILITY_FOCUS` | `Tela 2` | `Tela 2` |
 | reset agnóstico pela lib (`:blindcheck-focus`) | `Tela 2` | `Tela 2` |
+| aposentar a tela que sai | *não medido* | *não medido* |
 | rótulos únicos + `paneTitle` (controle) | `Tela 2` | `Tela 2 → Tela 2` |
 | reset combinado legado (como o app entrega hoje) | `Ir para home` | `Tela 2 → Ir para home → Button → Double-tap to activate` |
 
@@ -195,6 +196,117 @@ acontece; a ambiguidade que originou a investigação, não. Isso reforça que o
 alvo do reset precisa ser o primeiro item **do conteúdo do destino**, e é
 exatamente o que a biblioteca isola: o chrome fora da subárvore do modifier
 nunca é escolhido.
+
+## Resultado 7 — aposentar a tela que sai (implementado, ainda não medido)
+
+As duas abordagens que funcionam terminam com alguém **pedindo** foco. Este
+cenário testa a premissa oposta: a de que o leitor mantém o foco em um nó
+equivalente apenas **enquanto esse nó existe**.
+
+No cenário `retire-leaving-screen`, ao trocar de destino:
+
+1. o destino que sai limpa o foco de acessibilidade que estiver dentro da sua
+   própria subárvore (`ACTION_CLEAR_ACCESSIBILITY_FOCUS`), enquanto os nós ainda
+   existem — limpar depois de remover deixaria o leitor segurando um nó que não
+   responde mais;
+2. a subárvore inteira é publicada como um nó sem propriedade alguma, o que a
+   torna inelegível para o leitor;
+3. ninguém pede foco. Onde o leitor vai parar é a resposta da plataforma, e é
+   exatamente isso que o cenário mede.
+
+A borda usada é o `NavBackStackEntry` caindo abaixo de `RESUMED`: durante a
+transição, os dois destinos estão compostos ao mesmo tempo, que é a janela em
+que o leitor decide para onde o foco vai.
+
+**Este cenário ainda não foi medido.** A matriz exige emulador dedicado com
+TalkBack e o engine TTS do BlindCheck, e nenhum dispositivo estava conectado
+quando ele foi implementado. A linha da matriz é obtida com:
+
+```bash
+NAVGRAPH_TTS_RUNS=3 make navgraph-tts-matrix
+```
+
+O runner já inclui `retire-leaving-screen`. O que os testes instrumentados
+garantem hoje é o modo de falha perigoso desta estratégia: aposentar o lado
+errado da transição produz uma tela que **renderiza normalmente e é invisível
+para o leitor**, o que nenhuma verificação visual pega. Por isso
+`NavGraphRetireLeavingScreenTest` e `HomeFocusResetComparisonTest` afirmam que o
+destino que chega continua legível depois da troca.
+
+Três resultados possíveis, e todos são informação:
+
+| Se a saída for | Significa |
+| --- | --- |
+| `Tela 2` | a heurística do leitor depende do nó equivalente existir; o contorno pode ser feito sem pedir foco |
+| `Continuar` | o leitor recoloca o foco por posição, não por identidade do nó; remover a tela antiga não basta |
+| nada, ou foco perdido | limpar o foco sem oferecer destino deixa a pessoa sem contexto — pior que o baseline |
+
+## O que a comunidade faz com esse bug
+
+A busca por referências externas foi feita para responder à dúvida de coesão
+arquitetural: até que ponto o contorno deste repositório é idiossincrático.
+
+**O bug é conhecido e está aberto.** O registro público mais próximo do caso é
+[b/272065229 — *Navigating between screens causes TalkBack to focus…*](https://issuetracker.google.com/issues/272065229).
+A página exige login, então o conteúdo não pôde ser lido aqui; o título e a
+existência são verificáveis pela busca. A vizinhança de issues sobre foco do
+TalkBack no Compose é grande e antiga —
+[276915102](https://issuetracker.google.com/issues/276915102),
+[186443263](https://issuetracker.google.com/issues/186443263),
+[252992211](https://issuetracker.google.com/issues/252992211) —, o que sustenta
+a leitura de que não existe hoje uma resposta oficial para "reiniciar o foco no
+novo destino".
+
+**Não existe API pública para mover foco de acessibilidade.** A distinção
+aparece em todas as fontes: `FocusRequester` move foco de *teclado*, não o do
+leitor de tela. A recomendação da lista oficial de acessibilidade do Android é
+que o único caminho é **enviar um evento de acessibilidade**
+([eyes-free-dev](https://groups.google.com/g/eyes-free-dev/c/-ZtFWgwYahA)).
+Eevis Panula documenta o contorno que circula na comunidade — alternar
+`semantics { focused = true }` e desligar em seguida via `LaunchedEffect` —
+descrevendo-o explicitamente como não-oficial, achado em discussão de
+comunidade, e com boilerplate de estado
+([eevis.codes](https://eevis.codes/blog/2025-07-07/its-all-about-accessibility-focus-and-compose/)).
+Esse contorno é uma terceira forma de fazer o que `imperative-focus` e
+`agnostic-focus-reset` já fazem, com a diferença de exigir estado na tela.
+
+**A plataforma empurra para `paneTitle`, não para foco imperativo.** O sinal mais
+forte encontrado não é um blog: é o Material Components para Android
+[removendo](https://github.com/material-components/material-components-android/commit/516240d4e5519838305e4129235f964a5f82ef16)
+o código que trocava foco no bottom sheet, em favor do título de painel — *"Also
+removed the code to switch focus to the sheet on expansion in favor of this
+approach to align with TalkBack's APIs."* Um `View` com `accessibilityPaneTitle`
+emite `TYPE_WINDOW_STATE_CHANGED` ao aparecer, desaparecer ou mudar de título, e
+essa é a API que o TalkBack entende como "esta região se comporta como janela"
+([Android Developers](https://developer.android.com/guide/topics/ui/accessibility/principles)).
+A documentação também alerta que o TalkBack usa o título de painel **como
+identificador**, e que reaproveitar títulos genéricos entre telas independentes
+causa comportamento imprevisível — o que é coerente com o Resultado 4, em que
+`paneTitle` anunciou a troca de contexto mas não moveu o foco.
+
+**Outras plataformas têm o mesmo problema e a mesma falta de resposta.** No
+ecossistema React Native, a ordem de foco do último item ativo é preservada ao
+navegar, e a correção é feita à mão por tela
+([discussão em react-native-screens](https://github.com/software-mansion/react-native-screens/discussions/2874)).
+Há também o caso inverso, que vale como aviso para o Resultado 7: limpar foco
+antes da navegação deixou "o TalkBack focando primeiro a tela que desaparece"
+([issue #3147](https://github.com/software-mansion/react-native-screens/issues/3147)).
+
+### O que isso muda para a adoção
+
+| Pergunta | Resposta pela evidência externa |
+| --- | --- |
+| O contorno é idiossincrático? | Não. É a mesma família de contorno que a comunidade usa, com menos acoplamento à tela |
+| Existe API oficial melhor? | Não para mover foco. Para *anunciar* a troca, sim: `paneTitle` |
+| A plataforma prefere qual mecanismo? | `paneTitle`. O Material Components migrou nessa direção |
+| O que falta ser garantido? | Todas as fontes descrevem comportamento, nenhuma garante. O TTS spy continua sendo a única verificação |
+
+A leitura defensável para outros projetos é **combinar, não escolher**:
+`paneTitle` para comunicar a troca de contexto, porque é a API que a plataforma
+reconhece, mais um reset de foco para o primeiro item do conteúdo, porque o
+`paneTitle` sozinho deixa o foco no rótulo ambíguo. A matriz já tem os dois
+isolados; o que ela ainda não tem é a combinação `paneTitle` + reset agnóstico
+medida como um cenário próprio.
 
 ## Deliberação
 
