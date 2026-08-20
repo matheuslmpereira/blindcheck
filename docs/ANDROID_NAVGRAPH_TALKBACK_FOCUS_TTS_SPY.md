@@ -357,6 +357,47 @@ Ele:
 
 O teste precisa preservar o estado anterior do engine TTS e dos serviços de acessibilidade. Ele deve rodar apenas em emulador dedicado, pois a captura guarda textos de interface que podem ser sensíveis.
 
+## Resultado 8 — bottom sheet: o mesmo problema em outra forma
+
+O cenário `Iniciar cenário de bottom sheet` abre um `ModalBottomSheet` com
+título, texto e ação de fechar. A captura foi dirigida pelo contrato de usuário
+(`next` até o alvo, depois `activate`), com o log limpo antes de cada ação.
+
+Ao abrir o sheet:
+
+```text
+TTS Bottom Sheet
+WIN Bottom Sheet
+TTS Drag handle
+FOCUS Drag handle
+TTS Actions available, use Tap with 3 fingers to view
+```
+
+Ao fechar:
+
+```text
+WIN blindcheck-testeapp
+TTS blindcheck-testeapp
+FOCUS Abrir detalhes, Botão
+```
+
+Dois problemas distintos aparecem, e nenhum deles é o do NavGraph:
+
+1. **O foco entra no `Drag handle`, não no conteúdo.** O título do sheet,
+   `Detalhes do pedido`, não é falado em momento algum — quem usa o leitor
+   precisa navegar para descobrir o que abriu.
+2. **O anúncio é genérico e não é do app.** `Bottom Sheet` ao abrir e
+   `blindcheck-testeapp` ao fechar vêm do Material e da janela, em inglês, sem
+   relação com o conteúdo.
+
+O retorno do foco ao fechar está correto: volta para `Abrir detalhes`, o gatilho.
+
+Isso é coerente com o que o Material Components fez ao
+[remover](https://github.com/material-components/material-components-android/commit/516240d4e5519838305e4129235f964a5f82ef16)
+o roubo de foco no bottom sheet em favor do título de painel: a resposta esperada
+aqui é nomear o painel, não mover o foco à força. O cenário fica registrado como
+baseline; nenhum tratamento foi aplicado a ele ainda.
+
 ## Comparação de acoplamento e manutenibilidade
 
 A comparação entre os mecanismos — o que cada um exige da tela, o que acopla ao

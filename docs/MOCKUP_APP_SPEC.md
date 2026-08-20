@@ -145,6 +145,20 @@ on Tela 1, and asserts that Tela 2 begins with accessibility focus on `Tela 2`.
 Run it with the instrumentation argument `runTalkBackFocusTests=true`. It is skipped
 when Android does not bind TalkBack in the instrumentation environment.
 
+### Bottom sheet scenario
+
+Reached from the home screen through `Iniciar cenário de bottom sheet`. The
+screen shows the home action, the title `Tela com bottom sheet` and a single
+action, `Abrir detalhes`, which opens a modal bottom sheet containing:
+
+* the title `Detalhes do pedido`;
+* the text `O pedido foi confirmado e sera entregue em ate tres dias uteis.`;
+* the action `Fechar`.
+
+A sheet is a second container inside the same window, so opening it is not a
+destination change. The scenario exists to ask the focus question in that shape,
+and its labels are fixed so a capture can be attributed to a single element.
+
 ### Login
 
 Elements:

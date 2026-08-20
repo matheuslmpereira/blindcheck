@@ -36,6 +36,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -108,6 +110,7 @@ private sealed interface MockupScreen {
     data object ThreeScreenNavGraphFocusResetScenario : MockupScreen
     data object ThreeScreenNavGraphFocusResetWithLabel : MockupScreen
     data object ThreeScreenNavGraphFocusResetColorScenario : MockupScreen
+    data object BottomSheetScenario : MockupScreen
     data class NavGraphApproachScenario(
         val approach: NavGraphAccessibilityApproach,
     ) : MockupScreen
@@ -161,6 +164,7 @@ fun BlindCheckMockupApp(
                 onStartNavGraphApproach = { approach ->
                     screen = MockupScreen.NavGraphApproachScenario(approach)
                 },
+                onStartBottomSheetScenario = { screen = MockupScreen.BottomSheetScenario },
             )
 
             MockupScreen.FruitList -> FruitListScreen(
@@ -247,6 +251,11 @@ fun BlindCheckMockupApp(
                 continueLabel = ::colorButtonLabel,
             )
 
+            MockupScreen.BottomSheetScenario -> BottomSheetScenarioScreen(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+            )
+
             is MockupScreen.NavGraphApproachScenario -> ThreeScreenNavGraphScenario(
                 modifier = Modifier.padding(innerPadding),
                 onHome = { screen = MockupScreen.Login },
@@ -276,6 +285,7 @@ fun LoginScreen(
     onStartNavGraphFocusResetWithLabel: () -> Unit,
     onStartNavGraphFocusResetColorScenario: () -> Unit,
     onStartNavGraphApproach: (NavGraphAccessibilityApproach) -> Unit,
+    onStartBottomSheetScenario: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var email by rememberSaveable { mutableStateOf("") }
@@ -360,6 +370,13 @@ fun LoginScreen(
             onClick = { onStartNavGraphApproach(NavGraphAccessibilityApproach.AgnosticFocusReset) },
         ) {
             Text("Comparação: reset agnóstico pela lib")
+        }
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onStartBottomSheetScenario,
+        ) {
+            Text("Iniciar cenário de bottom sheet")
         }
 
         Button(
@@ -499,6 +516,75 @@ fun ThreeScreenScenarioScreen(
             onClick = onContinue,
         ) {
             Text(continueLabel(page))
+        }
+    }
+}
+
+/**
+ * Screen whose only action opens a modal bottom sheet.
+ *
+ * The sheet is a second container inside the same window, so it exercises the focus question the
+ * NavGraph scenarios ask, in the shape the platform treats differently: opening and closing a sheet
+ * is not a destination change. Labels are fixed so a capture can be attributed to one element.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BottomSheetScenarioScreen(
+    onHome: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var isSheetOpen by rememberSaveable { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ScenarioTopAppBar(onHome = onHome)
+
+        Text(
+            text = "Tela com bottom sheet",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { isSheetOpen = true },
+        ) {
+            Text("Abrir detalhes")
+        }
+    }
+
+    if (isSheetOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { isSheetOpen = false },
+            sheetState = sheetState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = "Detalhes do pedido",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                Text(text = "O pedido foi confirmado e sera entregue em ate tres dias uteis.")
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { isSheetOpen = false },
+                ) {
+                    Text("Fechar")
+                }
+            }
         }
     }
 }
