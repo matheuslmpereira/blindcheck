@@ -9,6 +9,7 @@ enum class NavGraphAccessibilityApproach(
     val announcesPaneTitle: Boolean = false,
     val requestsImperativeAccessibilityFocus: Boolean = false,
     val usesLibraryFocusReset: Boolean = false,
+    val usesSemanticsFocusFlag: Boolean = false,
     val retiresLeavingScreen: Boolean = false,
     val rendersHomeAction: Boolean = false,
     val isExperiment: Boolean = true,
@@ -52,6 +53,11 @@ enum class NavGraphAccessibilityApproach(
         argumentValue = "retire-leaving-screen",
         scenarioLabel = "Experimento NavGraph: aposentar a tela que sai",
         retiresLeavingScreen = true,
+    ),
+    SemanticsFocusFlag(
+        argumentValue = "semantics-focus-flag",
+        scenarioLabel = "Experimento NavGraph: flag focused na semântica",
+        usesSemanticsFocusFlag = true,
     ),
     UniqueLabelsWithPaneTitle(
         argumentValue = "unique-labels-pane-title",

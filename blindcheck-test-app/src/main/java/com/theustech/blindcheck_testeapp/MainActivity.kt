@@ -39,6 +39,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.focused
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
@@ -565,6 +568,24 @@ private fun NavGraphScenarioDestination(
     accessibilityApproach: NavGraphAccessibilityApproach,
     showHomeAction: Boolean,
 ) {
+    if (accessibilityApproach.usesSemanticsFocusFlag) {
+        // Community workaround: the screen marks its first item with the `focused` semantics
+        // property and flips it, which makes the Compose accessibility delegate move screen-reader
+        // focus there. Nothing outside the public semantics API is involved.
+        NavGraphScenarioContent(
+            modifier = Modifier,
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+            registerInitialAccessibilityTarget = {},
+            semanticsFocusFlag = rememberSemanticsFocusFlag(key = backStackEntry.id),
+        )
+        return
+    }
+
     if (accessibilityApproach.usesLibraryFocusReset) {
         // The library approach needs no per-screen infrastructure: the destination renders its
         // regular Compose content and hands the focus reset to the modifier, which resolves the
@@ -664,6 +685,7 @@ private fun NavGraphScenarioContent(
     accessibilityApproach: NavGraphAccessibilityApproach,
     showHomeAction: Boolean,
     registerInitialAccessibilityTarget: (View) -> Unit,
+    semanticsFocusFlag: Boolean? = null,
 ) {
     Column(
         modifier = modifier
@@ -694,6 +716,7 @@ private fun NavGraphScenarioContent(
             requestPlatformAccessibilityFocus =
                 accessibilityApproach.requestsImperativeAccessibilityFocus && !showHomeAction,
             onInitialAccessibilityTargetAvailable = registerInitialAccessibilityTarget,
+            semanticsFocusFlag = semanticsFocusFlag,
         )
 
         Button(
@@ -711,11 +734,35 @@ private fun NavGraphScenarioContent(
     }
 }
 
+/**
+ * Flips the `focused` semantics property once per [key], which is the workaround the Compose
+ * community uses to move screen-reader focus: the property change makes the accessibility delegate
+ * request `ACTION_ACCESSIBILITY_FOCUS` on that node. It is reset right after so the next
+ * destination can request focus again.
+ */
+@Composable
+private fun rememberSemanticsFocusFlag(key: Any?): Boolean {
+    var isFocused by remember(key) { mutableStateOf(false) }
+
+    LaunchedEffect(key) {
+        withFrameNanos { }
+        isFocused = true
+    }
+    LaunchedEffect(isFocused) {
+        if (isFocused) {
+            withFrameNanos { }
+            isFocused = false
+        }
+    }
+    return isFocused
+}
+
 @Composable
 private fun ScenarioTitle(
     page: Int,
     requestPlatformAccessibilityFocus: Boolean,
     onInitialAccessibilityTargetAvailable: (View) -> Unit,
+    semanticsFocusFlag: Boolean? = null,
 ) {
     val title = "Tela $page"
     if (requestPlatformAccessibilityFocus) {
@@ -736,6 +783,11 @@ private fun ScenarioTitle(
     } else {
         Text(
             text = title,
+            // Only the scenario under test publishes the property: leaving `focused = false` on
+            // every other title would add a variable to approaches that must stay untouched.
+            modifier = semanticsFocusFlag
+                ?.let { flag -> Modifier.semantics { focused = flag } }
+                ?: Modifier,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )

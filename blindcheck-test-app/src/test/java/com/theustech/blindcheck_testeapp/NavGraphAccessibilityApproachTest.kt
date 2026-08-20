@@ -12,13 +12,14 @@ class NavGraphAccessibilityApproachTest {
     fun `experiments change exactly one accessibility variable from baseline`() {
         val strategies = NavGraphAccessibilityApproach.experiments.associateBy { it.argumentValue }
 
-        assertEquals(9, strategies.size)
+        assertEquals(10, strategies.size)
         assertTrue(strategies.getValue("unique-labels").usesUniqueLabels)
         assertTrue(strategies.getValue("unique-node-ids").exposesUniqueNodeIds)
         assertTrue(strategies.getValue("recreated-semantics").recreatesDestinationSemantics)
         assertTrue(strategies.getValue("pane-title").announcesPaneTitle)
         assertTrue(strategies.getValue("imperative-focus").requestsImperativeAccessibilityFocus)
         assertTrue(strategies.getValue("agnostic-focus-reset").usesLibraryFocusReset)
+        assertTrue(strategies.getValue("semantics-focus-flag").usesSemanticsFocusFlag)
         assertTrue(strategies.getValue("retire-leaving-screen").retiresLeavingScreen)
         assertTrue(strategies.getValue("unique-labels-pane-title").usesUniqueLabels)
         assertTrue(strategies.getValue("unique-labels-pane-title").announcesPaneTitle)
@@ -34,6 +35,7 @@ class NavGraphAccessibilityApproachTest {
                 strategy.announcesPaneTitle,
                 strategy.requestsImperativeAccessibilityFocus,
                 strategy.usesLibraryFocusReset,
+                strategy.usesSemanticsFocusFlag,
                 strategy.retiresLeavingScreen,
             ).count { it }
             assertEquals("$name must isolate one variable", 1, enabledVariables)
