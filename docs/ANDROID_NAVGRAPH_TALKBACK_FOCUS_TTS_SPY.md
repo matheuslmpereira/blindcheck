@@ -357,6 +357,12 @@ Ele:
 
 O teste precisa preservar o estado anterior do engine TTS e dos serviços de acessibilidade. Ele deve rodar apenas em emulador dedicado, pois a captura guarda textos de interface que podem ser sensíveis.
 
+## Comparação de acoplamento e manutenibilidade
+
+A comparação entre os mecanismos — o que cada um exige da tela, o que acopla ao
+Compose e o que custa manter — está em
+[FOCUS_RESET_ACOPLAMENTO_E_MANUTENIBILIDADE.md](FOCUS_RESET_ACOPLAMENTO_E_MANUTENIBILIDADE.md).
+
 ## Limitações
 
 * O TTS spy é fiel ao texto entregue ao engine controlado, não à mixagem de áudio nem a sons não verbais do TalkBack.
