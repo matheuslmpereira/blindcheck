@@ -568,6 +568,54 @@ private fun NavGraphScenarioDestination(
     accessibilityApproach: NavGraphAccessibilityApproach,
     showHomeAction: Boolean,
 ) {
+    val rememberedFlag = rememberSemanticsFocusFlag(key = backStackEntry.id)
+
+    if (accessibilityApproach.flagsFocusOnDestinationRoot) {
+        // Same community mechanism, but injected from outside: the wrapper only has the
+        // destination root, not the screen content. Measures whether flagging a container that no
+        // screen reader can stop on moves focus anywhere.
+        NavGraphScenarioContent(
+            modifier = Modifier.semantics {
+                focused = rememberedFlag
+            },
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+            registerInitialAccessibilityTarget = {},
+        )
+        return
+    }
+
+    if (accessibilityApproach.injectsFocusAnchor) {
+        // Agnostic variant: the wrapper injects its own node as the first accessible item and
+        // flags that node. It never touches the screen content, but it does add one node to the
+        // reading order, described with metadata the navigation layer owns.
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .size(1.dp)
+                    .semantics {
+                        contentDescription = "Tela $page"
+                        focused = rememberedFlag
+                    },
+            )
+            NavGraphScenarioContent(
+                modifier = Modifier,
+                page = page,
+                onContinue = onContinue,
+                onHome = onHome,
+                continueLabel = continueLabel,
+                accessibilityApproach = accessibilityApproach,
+                showHomeAction = showHomeAction,
+                registerInitialAccessibilityTarget = {},
+            )
+        }
+        return
+    }
+
     if (accessibilityApproach.usesSemanticsFocusFlag) {
         // Community workaround: the screen marks its first item with the `focused` semantics
         // property and flips it, which makes the Compose accessibility delegate move screen-reader

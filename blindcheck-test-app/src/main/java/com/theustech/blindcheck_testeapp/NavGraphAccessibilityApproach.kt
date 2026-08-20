@@ -10,6 +10,8 @@ enum class NavGraphAccessibilityApproach(
     val requestsImperativeAccessibilityFocus: Boolean = false,
     val usesLibraryFocusReset: Boolean = false,
     val usesSemanticsFocusFlag: Boolean = false,
+    val flagsFocusOnDestinationRoot: Boolean = false,
+    val injectsFocusAnchor: Boolean = false,
     val retiresLeavingScreen: Boolean = false,
     val rendersHomeAction: Boolean = false,
     val isExperiment: Boolean = true,
@@ -58,6 +60,16 @@ enum class NavGraphAccessibilityApproach(
         argumentValue = "semantics-focus-flag",
         scenarioLabel = "Experimento NavGraph: flag focused na semântica",
         usesSemanticsFocusFlag = true,
+    ),
+    SemanticsFocusOnRoot(
+        argumentValue = "semantics-focus-root",
+        scenarioLabel = "Experimento NavGraph: flag focused no raiz do destino",
+        flagsFocusOnDestinationRoot = true,
+    ),
+    InjectedFocusAnchor(
+        argumentValue = "focus-anchor",
+        scenarioLabel = "Experimento NavGraph: âncora de foco injetada",
+        injectsFocusAnchor = true,
     ),
     UniqueLabelsWithPaneTitle(
         argumentValue = "unique-labels-pane-title",

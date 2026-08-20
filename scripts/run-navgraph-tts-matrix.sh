@@ -21,6 +21,8 @@ APPROACHES=(
   imperative-focus
   agnostic-focus-reset
   semantics-focus-flag
+  semantics-focus-root
+  focus-anchor
   retire-leaving-screen
   unique-labels-pane-title
   legacy-combined-reset
@@ -67,7 +69,14 @@ capture_approach() {
     --es "${APPROACH_EXTRA}" "${approach}" >/dev/null
   sleep 2
 
-  focus_page_one_button "${approach}" || die "Could not focus the page-one button for ${approach}."
+  # One approach that cannot be driven must not hide the whole matrix: record it and move on.
+  if ! focus_page_one_button "${approach}"; then
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "${run}" "${approach}" "UNREACHABLE" "-" "-" "could not focus the page-one button" \
+      >> "${SUMMARY_FILE}"
+    printf 'WARNING: could not focus the page-one button for %s.\n' "${approach}" >&2
+    return 0
+  fi
 
   "${ADB_BIN}" logcat -c
   broadcast "com.theustech.blindcheck.ACTION_ACTIVATE"
@@ -92,7 +101,9 @@ capture_approach() {
     "${run}" "${approach}" "${screen}" "${consecutive_duplicates}" "${final_focus}" "${tts_sequence}" \
     >> "${SUMMARY_FILE}"
 
-  [[ "${screen}" == "TELA_2" ]] || die "${approach} did not finish on Tela 2. See ${log_file}."
+  if [[ "${screen}" != "TELA_2" ]]; then
+    printf 'WARNING: %s did not finish on Tela 2. See %s\n' "${approach}" "${log_file}" >&2
+  fi
 }
 
 [[ "$("${ADB_BIN}" devices | awk 'NR > 1 && $2 == "device" { count += 1 } END { print count + 0 }')" == "1" ]] ||
