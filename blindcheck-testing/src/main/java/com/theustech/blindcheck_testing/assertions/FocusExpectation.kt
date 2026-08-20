@@ -8,6 +8,7 @@ data class FocusExpectation(
     val textContains: String? = null,
     val contentDescriptionEquals: String? = null,
     val contentDescriptionContains: String? = null,
+    val viewIdResourceNameEquals: String? = null,
     val clickable: Boolean? = null,
     val editable: Boolean? = null,
     val enabled: Boolean? = null,
@@ -17,6 +18,7 @@ data class FocusExpectation(
     fun matches(node: A11yNodeSnapshot): Boolean {
         return matchesText(node.text) &&
             matchesContentDescription(node.contentDescription) &&
+            matchesViewIdResourceName(node.viewIdResourceName) &&
             matchesState(node)
     }
 
@@ -24,6 +26,7 @@ data class FocusExpectation(
         val sourceNode = event.sourceNode
         return matchesEventText(event, sourceNode) &&
             matchesEventContentDescription(event, sourceNode) &&
+            matchesViewIdResourceName(sourceNode?.viewIdResourceName) &&
             matchesEventState(sourceNode)
     }
 
@@ -67,6 +70,10 @@ data class FocusExpectation(
             (contentDescriptionContains == null || values.any { it.contains(contentDescriptionContains) })
     }
 
+    private fun matchesViewIdResourceName(value: String?): Boolean {
+        return viewIdResourceNameEquals == null || value == viewIdResourceNameEquals
+    }
+
     private fun matchesState(node: A11yNodeSnapshot): Boolean {
         return (clickable == null || node.clickable == clickable) &&
             (editable == null || node.editable == editable) &&
@@ -89,6 +96,7 @@ data class FocusExpectation(
             textContains?.let { add("text contains \"$it\"") }
             contentDescriptionEquals?.let { add("contentDescription == \"$it\"") }
             contentDescriptionContains?.let { add("contentDescription contains \"$it\"") }
+            viewIdResourceNameEquals?.let { add("viewIdResourceName == \"$it\"") }
             clickable?.let { add("clickable == $it") }
             editable?.let { add("editable == $it") }
             enabled?.let { add("enabled == $it") }

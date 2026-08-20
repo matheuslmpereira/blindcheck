@@ -13,6 +13,7 @@ Toolkit de acessibilidade Android para validar a experiência de usuários cegos
 | Validar a ordem de leitura dos elementos | `FocusSequenceExpectation` |
 | Verificar que textos de erro são acessíveis | `assertCurrentWindowContains` |
 | Simular gestos via terminal/CI | `makefile` / ADB broadcast |
+| Reiniciar o foco ao trocar de tela | `blindcheck-focus` |
 
 ---
 
@@ -254,6 +255,7 @@ FocusExpectation(
 ```
 blindcheck/
 ├── blindcheck-testing/        ← sua dependência de teste
+├── blindcheck-focus/          ← dependência do app: reset de foco entre telas
 ├── blindcheck-tracker/        ← infraestrutura interna (normalização de eventos)
 ├── blindcheck-interactor/     ← serviço de acessibilidade + broadcast receiver
 ├── blindcheck-tracking-app/   ← app companion instalado no dispositivo
@@ -264,6 +266,7 @@ blindcheck/
 | Módulo | Para quem | O que faz |
 |---|---|---|
 | [`blindcheck-testing`](blindcheck-testing/README.md) | Quem escreve testes | Driver, asserções, matchers |
+| [`blindcheck-focus`](blindcheck-focus/README.md) | Quem escreve o app | Reinicia o foco no primeiro item da nova tela |
 | [`blindcheck-desktop`](blindcheck-desktop/README.md) | Quem explora manualmente | Remote control + log de anúncios |
 | [`blindcheck-tracking-app`](blindcheck-tracking-app/README.md) | Instalado no dispositivo | Captura eventos, expõe broadcasts |
 | [`blindcheck-interactor`](blindcheck-interactor/README.md) | Infraestrutura interna | `AccessibilityService` + gestos físicos |

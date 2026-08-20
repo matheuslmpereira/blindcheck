@@ -136,6 +136,27 @@ class BlindCheckContractsTest {
     }
 
     @Test
+    fun focusExpectation_matchesStableAndroidResourceId() {
+        val node = A11yNodeSnapshot(
+            text = "Continuar",
+            viewIdResourceName = "navgraph_continue_page_2",
+            clickable = true,
+        )
+
+        assertTrue(
+            FocusExpectation(
+                viewIdResourceNameEquals = "navgraph_continue_page_2",
+                clickable = true,
+            ).matches(node),
+        )
+        assertFalse(
+            FocusExpectation(
+                viewIdResourceNameEquals = "navgraph_continue_page_1",
+            ).matches(node),
+        )
+    }
+
+    @Test
     fun feedbackExpectation_matchesEventTextOrContentDescription() {
         val textEvent = A11yEventRecord(
             id = "event-1",

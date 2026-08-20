@@ -16,6 +16,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Declared through the DSL because -Pandroid.testInstrumentationRunnerArguments.* is
+        // dropped when configuration caching is on, which silently skipped the opt-in tests.
+        testInstrumentationRunnerArguments["runTalkBackFocusTests"] =
+            providers.gradleProperty("runTalkBackFocusTests").getOrElse("false")
     }
 
     buildTypes {
@@ -41,14 +45,17 @@ android {
 
 dependencies {
 
+    implementation(project(":blindcheck-focus"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     testImplementation(libs.junit)
     androidTestImplementation(project(":blindcheck-testing"))
     androidTestImplementation(libs.kotlinx.coroutines.test)

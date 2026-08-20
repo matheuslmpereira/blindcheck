@@ -94,4 +94,39 @@ class AndroidAccessibilityNodeMapperTest {
         child.recycle()
     }
 
+
+    @Test
+    fun map_keepsLabelsOfDeeplyNestedNodes() {
+        val depth = 16
+        val nodes = List(depth) { level ->
+            AccessibilityNodeInfo.obtain().apply {
+                className = "android.widget.FrameLayout"
+                if (level == depth - 1) {
+                    text = "Tela 1"
+                    className = "android.widget.TextView"
+                }
+            }
+        }
+        nodes.zipWithNext { parent, child -> shadowOf(parent).addChild(child) }
+
+        val snapshot = nodes.first().useNode { mapper.map(it) }!!
+
+        val labels = generateSequence(snapshot) { it.children.firstOrNull() }.mapNotNull { it.text }
+        assertEquals(listOf("Tela 1"), labels.toList())
+        nodes.drop(1).forEach { it.recycle() }
+    }
+
+    @Test
+    fun map_stopsAtTheConfiguredDepth() {
+        val shallowMapper = AndroidAccessibilityNodeMapper(maxDepth = 1)
+        val child = AccessibilityNodeInfo.obtain().apply { text = "muito fundo" }
+        val parent = AccessibilityNodeInfo.obtain().apply { className = "android.widget.LinearLayout" }
+        shadowOf(parent).addChild(child)
+
+        val snapshot = parent.useNode { shallowMapper.map(it) }!!
+
+        assertEquals(1, snapshot.children.size)
+        assertTrue(snapshot.children.first().children.isEmpty())
+        child.recycle()
+    }
 }

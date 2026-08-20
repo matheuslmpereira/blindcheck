@@ -1,6 +1,9 @@
 package com.theustech.blindcheck_testeapp
 
 import android.os.Bundle
+import android.view.View
+import android.widget.ImageButton
+import android.widget.TextView
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,6 +20,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,26 +31,50 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.focused
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.sp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavBackStackEntry
+import com.theustech.blindcheck_focus.AccessibilityFocusResetStrategy
+import com.theustech.blindcheck_focus.resetAccessibilityFocusOnEnter
 import com.theustech.blindcheck_testeapp.ui.theme.BlindchecktesteappTheme
 
 internal val deterministicFruits = listOf(
@@ -72,29 +101,70 @@ private sealed interface MockupScreen {
     data object Login : MockupScreen
     data object FruitList : MockupScreen
     data class FruitDetail(val fruit: Fruit) : MockupScreen
+    data class ThreeScreenScenario(val page: Int) : MockupScreen
+    data object ThreeScreenNavGraph : MockupScreen
+    data class ThreeScreenScenarioWithLabel(val page: Int) : MockupScreen
+    data object ThreeScreenNavGraphWithLabel : MockupScreen
+    data class ThreeScreenColorScenario(val page: Int) : MockupScreen
+    data object ThreeScreenNavGraphColorScenario : MockupScreen
+    data object ThreeScreenNavGraphFocusResetScenario : MockupScreen
+    data object ThreeScreenNavGraphFocusResetWithLabel : MockupScreen
+    data object ThreeScreenNavGraphFocusResetColorScenario : MockupScreen
+    data object BottomSheetScenario : MockupScreen
+    data class NavGraphApproachScenario(
+        val approach: NavGraphAccessibilityApproach,
+    ) : MockupScreen
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val initialApproach = NavGraphAccessibilityApproach.fromArgument(
+            intent.getStringExtra(EXTRA_NAVGRAPH_ACCESSIBILITY_APPROACH),
+        )
         setContent {
             BlindchecktesteappTheme {
-                BlindCheckMockupApp()
+                BlindCheckMockupApp(initialNavGraphApproach = initialApproach)
             }
         }
     }
 }
 
 @Composable
-fun BlindCheckMockupApp() {
-    var screen by remember { mutableStateOf<MockupScreen>(MockupScreen.Login) }
+fun BlindCheckMockupApp(
+    initialNavGraphApproach: NavGraphAccessibilityApproach? = null,
+) {
+    var screen by remember(initialNavGraphApproach) {
+        mutableStateOf<MockupScreen>(
+            initialNavGraphApproach
+                ?.let(MockupScreen::NavGraphApproachScenario)
+                ?: MockupScreen.Login,
+        )
+    }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         when (val currentScreen = screen) {
             MockupScreen.Login -> LoginScreen(
                 modifier = Modifier.padding(innerPadding),
                 onLoginSuccess = { screen = MockupScreen.FruitList },
+                onStartThreeScreenScenario = { screen = MockupScreen.ThreeScreenScenario(page = 1) },
+                onStartThreeScreenNavGraphScenario = { screen = MockupScreen.ThreeScreenNavGraph },
+                onStartScenarioWithLabelOne = { screen = MockupScreen.ThreeScreenScenarioWithLabel(page = 1) },
+                onStartNavGraphScenarioWithLabelTwo = { screen = MockupScreen.ThreeScreenNavGraphWithLabel },
+                onStartColorScenario = { screen = MockupScreen.ThreeScreenColorScenario(page = 1) },
+                onStartNavGraphColorScenario = { screen = MockupScreen.ThreeScreenNavGraphColorScenario },
+                onStartNavGraphFocusResetScenario = { screen = MockupScreen.ThreeScreenNavGraphFocusResetScenario },
+                onStartNavGraphFocusResetWithLabel = {
+                    screen = MockupScreen.ThreeScreenNavGraphFocusResetWithLabel
+                },
+                onStartNavGraphFocusResetColorScenario = {
+                    screen = MockupScreen.ThreeScreenNavGraphFocusResetColorScenario
+                },
+                onStartNavGraphApproach = { approach ->
+                    screen = MockupScreen.NavGraphApproachScenario(approach)
+                },
+                onStartBottomSheetScenario = { screen = MockupScreen.BottomSheetScenario },
             )
 
             MockupScreen.FruitList -> FruitListScreen(
@@ -107,6 +177,90 @@ fun BlindCheckMockupApp() {
                 modifier = Modifier.padding(innerPadding),
                 fruit = currentScreen.fruit,
                 onBack = { screen = MockupScreen.FruitList },
+            )
+
+            is MockupScreen.ThreeScreenScenario -> ThreeScreenScenarioScreen(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                page = currentScreen.page,
+                onContinue = {
+                    screen = MockupScreen.ThreeScreenScenario(
+                        page = if (currentScreen.page == 3) 1 else currentScreen.page + 1,
+                    )
+                },
+            )
+
+            MockupScreen.ThreeScreenNavGraph -> ThreeScreenNavGraphScenario(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+            )
+
+            is MockupScreen.ThreeScreenScenarioWithLabel -> ThreeScreenScenarioScreen(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                page = currentScreen.page,
+                continueLabel = { page -> "continuar $page" },
+                onContinue = {
+                    screen = MockupScreen.ThreeScreenScenarioWithLabel(
+                        page = if (currentScreen.page == 3) 1 else currentScreen.page + 1,
+                    )
+                },
+            )
+
+            MockupScreen.ThreeScreenNavGraphWithLabel -> ThreeScreenNavGraphScenario(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                continueLabel = { page -> "continuar $page" },
+            )
+
+            is MockupScreen.ThreeScreenColorScenario -> ThreeScreenScenarioScreen(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                page = currentScreen.page,
+                continueLabel = ::colorButtonLabel,
+                onContinue = {
+                    screen = MockupScreen.ThreeScreenColorScenario(
+                        page = if (currentScreen.page == 3) 1 else currentScreen.page + 1,
+                    )
+                },
+            )
+
+            MockupScreen.ThreeScreenNavGraphColorScenario -> ThreeScreenNavGraphScenario(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                continueLabel = ::colorButtonLabel,
+            )
+
+            MockupScreen.ThreeScreenNavGraphFocusResetScenario -> ThreeScreenNavGraphScenario(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                accessibilityApproach = NavGraphAccessibilityApproach.LegacyCombinedReset,
+            )
+
+            MockupScreen.ThreeScreenNavGraphFocusResetWithLabel -> ThreeScreenNavGraphScenario(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                accessibilityApproach = NavGraphAccessibilityApproach.LegacyCombinedReset,
+                continueLabel = { page -> "continuar $page" },
+            )
+
+            MockupScreen.ThreeScreenNavGraphFocusResetColorScenario -> ThreeScreenNavGraphScenario(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                accessibilityApproach = NavGraphAccessibilityApproach.LegacyCombinedReset,
+                continueLabel = ::colorButtonLabel,
+            )
+
+            MockupScreen.BottomSheetScenario -> BottomSheetScenarioScreen(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+            )
+
+            is MockupScreen.NavGraphApproachScenario -> ThreeScreenNavGraphScenario(
+                modifier = Modifier.padding(innerPadding),
+                onHome = { screen = MockupScreen.Login },
+                accessibilityApproach = currentScreen.approach,
+                showHomeAction = currentScreen.approach.rendersHomeAction,
             )
         }
     }
@@ -121,11 +275,23 @@ fun BlindCheckMockupApp() {
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onStartThreeScreenScenario: () -> Unit,
+    onStartThreeScreenNavGraphScenario: () -> Unit,
+    onStartScenarioWithLabelOne: () -> Unit,
+    onStartNavGraphScenarioWithLabelTwo: () -> Unit,
+    onStartColorScenario: () -> Unit,
+    onStartNavGraphColorScenario: () -> Unit,
+    onStartNavGraphFocusResetScenario: () -> Unit,
+    onStartNavGraphFocusResetWithLabel: () -> Unit,
+    onStartNavGraphFocusResetColorScenario: () -> Unit,
+    onStartNavGraphApproach: (NavGraphAccessibilityApproach) -> Unit,
+    onStartBottomSheetScenario: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var submitted by rememberSaveable { mutableStateOf(false) }
+    var navigationTestCasesExpanded by rememberSaveable { mutableStateOf(false) }
 
     val emailError = submitted && email.isBlank()
     val passwordError = submitted && password.isBlank()
@@ -133,6 +299,7 @@ fun LoginScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -184,7 +351,637 @@ fun LoginScreen(
         ) {
             Text("Entrar")
         }
+
+        Text(
+            text = "Comparação de reset de foco",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onStartNavGraphApproach(NavGraphAccessibilityApproach.ImperativeFocus) },
+        ) {
+            Text("Comparação: foco imperativo (método inicial)")
+        }
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onStartNavGraphApproach(NavGraphAccessibilityApproach.AgnosticFocusReset) },
+        ) {
+            Text("Comparação: reset agnóstico pela lib")
+        }
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onStartBottomSheetScenario,
+        ) {
+            Text("Iniciar cenário de bottom sheet")
+        }
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { onStartNavGraphApproach(NavGraphAccessibilityApproach.RetireLeavingScreen) },
+        ) {
+            Text("Comparação: aposentar a tela que sai")
+        }
+
+        TextButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { navigationTestCasesExpanded = !navigationTestCasesExpanded },
+        ) {
+            Text(
+                if (navigationTestCasesExpanded) {
+                    "Ocultar casos de teste de navegação"
+                } else {
+                    "Mostrar casos de teste de navegação"
+                },
+            )
+        }
+
+        if (navigationTestCasesExpanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "Casos de teste de navegação",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartThreeScreenScenario,
+                ) {
+                    Text("Iniciar navegação por recomposição")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartThreeScreenNavGraphScenario,
+                ) {
+                    Text("Iniciar navegação por NavGraph")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartScenarioWithLabelOne,
+                ) {
+                    Text("Iniciar navegação numerada por recomposição")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartNavGraphScenarioWithLabelTwo,
+                ) {
+                    Text("Iniciar navegação numerada por NavGraph")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartColorScenario,
+                ) {
+                    Text("Iniciar navegação por cores (recomposição)")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartNavGraphColorScenario,
+                ) {
+                    Text("Iniciar navegação por cores (NavGraph)")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartNavGraphFocusResetScenario,
+                ) {
+                    Text("Iniciar navegação por NavGraph com foco reiniciado")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartNavGraphFocusResetWithLabel,
+                ) {
+                    Text("Iniciar navegação numerada por NavGraph com foco reiniciado")
+                }
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onStartNavGraphFocusResetColorScenario,
+                ) {
+                    Text("Iniciar navegação por cores (NavGraph com foco reiniciado)")
+                }
+
+                Text(
+                    text = "Experimentos isolados de acessibilidade NavGraph",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                NavGraphAccessibilityApproach.experiments.forEach { approach ->
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onStartNavGraphApproach(approach) },
+                    ) {
+                        Text(approach.scenarioLabel)
+                    }
+                }
+            }
+        }
     }
+}
+
+@Composable
+fun ThreeScreenScenarioScreen(
+    page: Int,
+    onContinue: () -> Unit,
+    onHome: () -> Unit,
+    continueLabel: (Int) -> String = { "Continuar" },
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ScenarioTopAppBar(onHome = onHome)
+
+        Text(
+            text = "Tela $page",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onContinue,
+        ) {
+            Text(continueLabel(page))
+        }
+    }
+}
+
+/**
+ * Screen whose only action opens a modal bottom sheet.
+ *
+ * The sheet is a second container inside the same window, so it exercises the focus question the
+ * NavGraph scenarios ask, in the shape the platform treats differently: opening and closing a sheet
+ * is not a destination change. Labels are fixed so a capture can be attributed to one element.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BottomSheetScenarioScreen(
+    onHome: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var isSheetOpen by rememberSaveable { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        ScenarioTopAppBar(onHome = onHome)
+
+        Text(
+            text = "Tela com bottom sheet",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { isSheetOpen = true },
+        ) {
+            Text("Abrir detalhes")
+        }
+    }
+
+    if (isSheetOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { isSheetOpen = false },
+            sheetState = sheetState,
+            // Without the handle the first accessible item of the sheet is its own title, instead
+            // of a control that says nothing about what opened.
+            dragHandle = null,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = "Detalhes do pedido",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+
+                Text(text = "O pedido foi confirmado e sera entregue em ate tres dias uteis.")
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { isSheetOpen = false },
+                ) {
+                    Text("Fechar")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ThreeScreenNavGraphScenario(
+    onHome: () -> Unit,
+    modifier: Modifier = Modifier,
+    accessibilityApproach: NavGraphAccessibilityApproach = NavGraphAccessibilityApproach.Baseline,
+    continueLabel: (Int) -> String = accessibilityApproach::continueLabel,
+    showHomeAction: Boolean = true,
+) {
+    val navController = rememberNavController()
+
+    NavHost(
+        navController = navController,
+        startDestination = "nav_graph_screen_1",
+        modifier = modifier,
+    ) {
+        composable("nav_graph_screen_1") { backStackEntry ->
+            NavGraphScenarioDestination(
+                backStackEntry = backStackEntry,
+                page = 1,
+                onHome = onHome,
+                continueLabel = continueLabel,
+                accessibilityApproach = accessibilityApproach,
+                showHomeAction = showHomeAction,
+                onContinue = { navController.navigate("nav_graph_screen_2") },
+            )
+        }
+        composable("nav_graph_screen_2") { backStackEntry ->
+            NavGraphScenarioDestination(
+                backStackEntry = backStackEntry,
+                page = 2,
+                onHome = onHome,
+                continueLabel = continueLabel,
+                accessibilityApproach = accessibilityApproach,
+                showHomeAction = showHomeAction,
+                onContinue = { navController.navigate("nav_graph_screen_3") },
+            )
+        }
+        composable("nav_graph_screen_3") { backStackEntry ->
+            NavGraphScenarioDestination(
+                backStackEntry = backStackEntry,
+                page = 3,
+                onHome = onHome,
+                continueLabel = continueLabel,
+                accessibilityApproach = accessibilityApproach,
+                showHomeAction = showHomeAction,
+                onContinue = {
+                    navController.navigate("nav_graph_screen_1") {
+                        popUpTo("nav_graph_screen_1") { inclusive = true }
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun NavGraphScenarioDestination(
+    backStackEntry: NavBackStackEntry,
+    page: Int,
+    onContinue: () -> Unit,
+    onHome: () -> Unit,
+    continueLabel: (Int) -> String,
+    accessibilityApproach: NavGraphAccessibilityApproach,
+    showHomeAction: Boolean,
+) {
+    val rememberedFlag = rememberSemanticsFocusFlag(key = backStackEntry.id)
+
+    if (accessibilityApproach.flagsFocusOnDestinationRoot) {
+        // Same community mechanism, but injected from outside: the wrapper only has the
+        // destination root, not the screen content. Measures whether flagging a container that no
+        // screen reader can stop on moves focus anywhere.
+        NavGraphScenarioContent(
+            modifier = Modifier.semantics {
+                focused = rememberedFlag
+            },
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+            registerInitialAccessibilityTarget = {},
+        )
+        return
+    }
+
+    if (accessibilityApproach.injectsFocusAnchor) {
+        // Agnostic variant: the wrapper injects its own node as the first accessible item and
+        // flags that node. It never touches the screen content, but it does add one node to the
+        // reading order, described with metadata the navigation layer owns.
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .size(1.dp)
+                    .semantics {
+                        contentDescription = "Tela $page"
+                        focused = rememberedFlag
+                    },
+            )
+            NavGraphScenarioContent(
+                modifier = Modifier,
+                page = page,
+                onContinue = onContinue,
+                onHome = onHome,
+                continueLabel = continueLabel,
+                accessibilityApproach = accessibilityApproach,
+                showHomeAction = showHomeAction,
+                registerInitialAccessibilityTarget = {},
+            )
+        }
+        return
+    }
+
+    if (accessibilityApproach.usesSemanticsFocusFlag) {
+        // Community workaround: the screen marks its first item with the `focused` semantics
+        // property and flips it, which makes the Compose accessibility delegate move screen-reader
+        // focus there. Nothing outside the public semantics API is involved.
+        NavGraphScenarioContent(
+            modifier = Modifier,
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+            registerInitialAccessibilityTarget = {},
+            semanticsFocusFlag = rememberSemanticsFocusFlag(key = backStackEntry.id),
+        )
+        return
+    }
+
+    if (accessibilityApproach.usesLibraryFocusReset) {
+        // The library approach needs no per-screen infrastructure: the destination renders its
+        // regular Compose content and hands the focus reset to the modifier, which resolves the
+        // first accessible item from the semantics tree of this subtree alone.
+        NavGraphScenarioContent(
+            modifier = Modifier.resetAccessibilityFocusOnEnter(key = backStackEntry.id),
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+            registerInitialAccessibilityTarget = {},
+        )
+        return
+    }
+
+    if (accessibilityApproach.retiresLeavingScreen) {
+        // Nothing here asks for focus. The destination on its way out clears the focus it holds
+        // and drops itself from the accessibility tree, so the only accessible content left is the
+        // one arriving — and where the reader lands is the platform's answer, which is exactly
+        // what this scenario measures.
+        NavGraphScenarioContent(
+            modifier = Modifier.resetAccessibilityFocusOnEnter(
+                key = backStackEntry.id,
+                strategy = AccessibilityFocusResetStrategy.RetireLeavingContent,
+                isShowing = rememberIsDestinationShowing(backStackEntry),
+            ),
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+            registerInitialAccessibilityTarget = {},
+        )
+        return
+    }
+
+    if (accessibilityApproach.recreatesDestinationSemantics) {
+        key(page) {
+            NavGraphScenarioScreen(
+                page = page,
+                onContinue = onContinue,
+                onHome = onHome,
+                continueLabel = continueLabel,
+                accessibilityApproach = accessibilityApproach,
+                showHomeAction = showHomeAction,
+            ).Render(backStackEntry)
+        }
+    } else {
+        NavGraphScenarioScreen(
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+        ).Render(backStackEntry)
+    }
+}
+
+private class NavGraphScenarioScreen(
+    private val page: Int,
+    private val onContinue: () -> Unit,
+    private val onHome: () -> Unit,
+    private val continueLabel: (Int) -> String,
+    private val accessibilityApproach: NavGraphAccessibilityApproach,
+    private val showHomeAction: Boolean,
+) : Screen() {
+
+    @Composable
+    override fun Content(
+        modifier: Modifier,
+        registerInitialAccessibilityTarget: (View) -> Unit,
+    ) {
+        NavGraphScenarioContent(
+            modifier = modifier,
+            page = page,
+            onContinue = onContinue,
+            onHome = onHome,
+            continueLabel = continueLabel,
+            accessibilityApproach = accessibilityApproach,
+            showHomeAction = showHomeAction,
+            registerInitialAccessibilityTarget = registerInitialAccessibilityTarget,
+        )
+    }
+}
+
+@Composable
+private fun NavGraphScenarioContent(
+    modifier: Modifier,
+    page: Int,
+    onContinue: () -> Unit,
+    onHome: () -> Unit,
+    continueLabel: (Int) -> String,
+    accessibilityApproach: NavGraphAccessibilityApproach,
+    showHomeAction: Boolean,
+    registerInitialAccessibilityTarget: (View) -> Unit,
+    semanticsFocusFlag: Boolean? = null,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .semantics {
+                if (accessibilityApproach.announcesPaneTitle) {
+                    isTraversalGroup = true
+                    paneTitle = "Tela $page"
+                }
+                if (accessibilityApproach.exposesUniqueNodeIds) {
+                    testTagsAsResourceId = true
+                }
+            },
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        if (showHomeAction) {
+            ScenarioTopAppBar(
+                onHome = onHome,
+                isFirstAccessibilityElement = accessibilityApproach.requestsImperativeAccessibilityFocus,
+                requestPlatformAccessibilityFocus = accessibilityApproach.requestsImperativeAccessibilityFocus,
+                onInitialAccessibilityTargetAvailable = registerInitialAccessibilityTarget,
+            )
+        }
+
+        ScenarioTitle(
+            page = page,
+            requestPlatformAccessibilityFocus =
+                accessibilityApproach.requestsImperativeAccessibilityFocus && !showHomeAction,
+            onInitialAccessibilityTargetAvailable = registerInitialAccessibilityTarget,
+            semanticsFocusFlag = semanticsFocusFlag,
+        )
+
+        Button(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    accessibilityApproach.continueNodeId(page)
+                        ?.let { Modifier.testTag(it) }
+                        ?: Modifier,
+                ),
+            onClick = onContinue,
+        ) {
+            Text(continueLabel(page))
+        }
+    }
+}
+
+/**
+ * Flips the `focused` semantics property once per [key], which is the workaround the Compose
+ * community uses to move screen-reader focus: the property change makes the accessibility delegate
+ * request `ACTION_ACCESSIBILITY_FOCUS` on that node. It is reset right after so the next
+ * destination can request focus again.
+ */
+@Composable
+private fun rememberSemanticsFocusFlag(key: Any?): Boolean {
+    var isFocused by remember(key) { mutableStateOf(false) }
+
+    LaunchedEffect(key) {
+        withFrameNanos { }
+        isFocused = true
+    }
+    LaunchedEffect(isFocused) {
+        if (isFocused) {
+            withFrameNanos { }
+            isFocused = false
+        }
+    }
+    return isFocused
+}
+
+@Composable
+private fun ScenarioTitle(
+    page: Int,
+    requestPlatformAccessibilityFocus: Boolean,
+    onInitialAccessibilityTargetAvailable: (View) -> Unit,
+    semanticsFocusFlag: Boolean? = null,
+) {
+    val title = "Tela $page"
+    if (requestPlatformAccessibilityFocus) {
+        key(page) {
+            AndroidView(
+                modifier = Modifier.fillMaxWidth(),
+                factory = { context ->
+                    TextView(context).apply {
+                        text = title
+                        textSize = 28f
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                        onInitialAccessibilityTargetAvailable(this)
+                    }
+                },
+            )
+        }
+    } else {
+        Text(
+            text = title,
+            // Only the scenario under test publishes the property: leaving `focused = false` on
+            // every other title would add a variable to approaches that must stay untouched.
+            modifier = semanticsFocusFlag
+                ?.let { flag -> Modifier.semantics { focused = flag } }
+                ?: Modifier,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScenarioTopAppBar(
+    onHome: () -> Unit,
+    isFirstAccessibilityElement: Boolean = false,
+    requestPlatformAccessibilityFocus: Boolean = false,
+    onInitialAccessibilityTargetAvailable: (View) -> Unit = {},
+) {
+    TopAppBar(
+        title = {},
+        navigationIcon = {
+            if (requestPlatformAccessibilityFocus) {
+                AndroidView(
+                    modifier = Modifier.size(48.dp),
+                    factory = { context ->
+                        ImageButton(context).apply {
+                            contentDescription = "Ir para home"
+                            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                            setOnClickListener { onHome() }
+                            onInitialAccessibilityTargetAvailable(this)
+                        }
+                    },
+                )
+            } else {
+                IconButton(
+                    onClick = onHome,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Ir para home"
+                        if (isFirstAccessibilityElement) {
+                            traversalIndex = -1f
+                        }
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Home,
+                        contentDescription = null,
+                    )
+                }
+            }
+        },
+    )
+}
+
+internal const val EXTRA_NAVGRAPH_ACCESSIBILITY_APPROACH =
+    "com.theustech.blindcheck_testeapp.NAVGRAPH_ACCESSIBILITY_APPROACH"
+
+private fun colorButtonLabel(page: Int): String = when (page) {
+    1 -> "red"
+    2 -> "blue"
+    3 -> "green"
+    else -> error("Unsupported scenario page: $page")
 }
 
 @Composable

@@ -70,10 +70,20 @@ tts-smoke:
 		-a com.theustech.blindcheck.ACTION_TTS_SMOKE \
 		--es com.theustech.blindcheck.EXTRA_TTS_TEXT BlindCheck_TTS_smoke_test
 
+.PHONY: navgraph-tts-matrix
+navgraph-tts-matrix:
+	./scripts/run-navgraph-tts-matrix.sh
+
 .PHONY: validate
 validate:
 	./gradlew test connectedDebugAndroidTest
 ```
+
+`navgraph-tts-matrix` requires the apps to be installed, TalkBack and the tracker
+to be bound, and the BlindCheck engine to be selected. Set
+`NAVGRAPH_TTS_RUNS=3` to repeat every scenario three times. The command stores
+the raw `TTS`, `FOCUS`, and `WIN` evidence plus a TSV summary under the test
+app's build reports directory.
 
 ## Note
 
