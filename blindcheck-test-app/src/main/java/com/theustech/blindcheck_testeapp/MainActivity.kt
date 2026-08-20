@@ -562,6 +562,9 @@ fun BottomSheetScenarioScreen(
         ModalBottomSheet(
             onDismissRequest = { isSheetOpen = false },
             sheetState = sheetState,
+            // Without the handle the first accessible item of the sheet is its own title, instead
+            // of a control that says nothing about what opened.
+            dragHandle = null,
         ) {
             Column(
                 modifier = Modifier
